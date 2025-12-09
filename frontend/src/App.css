@@ -1,0 +1,1023 @@
+/* app.css */
+
+/* Font Imports */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Marhey:wght@400;700&display=swap');
+
+/* Font Classes */
+.mountains-of-christmas-regular {
+  font-family: "Mountains of Christmas", serif;
+  font-weight: 400;
+  font-style: normal;
+}
+
+.mountains-of-christmas-bold {
+  font-family: "Mountains of Christmas", serif;
+  font-weight: 700;
+  font-style: normal;
+}
+
+.marhey-regular {
+  font-family: "Marhey", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+}
+
+.marhey-bold {
+  font-family: "Marhey", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 700;
+  font-style: normal;
+}
+
+/* Global Styles */
+/* In app.css */
+.wrap {
+  min-height: 100vh;
+  font-family: 'Marhey', sans-serif;
+  background-image: url('/images/Generate%20a%20cosmic%20sp.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  color: #e0f7fa;
+  overflow-x: hidden;
+}
+
+/* Header */
+.header {
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(0, 229, 255, 0.3);
+  padding: 1rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 2rem;
+}
+
+.logo {
+  font-family: "Mountains of Christmas", serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #629ce8;
+  text-decoration: none;
+  text-shadow: 0 0 20px #4fb5e1;
+  letter-spacing: 1px;
+}
+
+.nav {
+  display: flex;
+  gap: 2rem;
+}
+
+.nav-link {
+  color: #b2ebf2;
+  text-decoration: none;
+  font-family: "Marhey", sans-serif;
+  font-weight: 400;
+  font-size: 1.1rem;
+  text-shadow: 0 0 5px #00e5ff;
+  transition: all 0.3s ease;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+}
+
+.nav-link:hover {
+  color: #00e5ff;
+  text-shadow: 0 0 15px #00e5ff;
+  background: rgba(0, 229, 255, 0.1);
+}
+
+/* User Info & Logout */
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-left: 2rem;
+  padding-left: 2rem;
+  border-left: 2px solid rgba(0, 229, 255, 0.3);
+}
+
+.username {
+  color: #b2ebf2;
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-shadow: 0 0 5px #00e5ff;
+}
+
+.logout-btn {
+  background: linear-gradient(135deg, #ff6b6b, #ee5a6f);
+  color: white;
+  border: none;
+  padding: 0.5rem 1.2rem;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+  text-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 10px rgba(255, 107, 107, 0.3);
+}
+
+.logout-btn:hover {
+  background: linear-gradient(135deg, #ff5252, #ff1744);
+  transform: scale(1.05);
+  box-shadow: 0 0 20px rgba(255, 107, 107, 0.6);
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.logout-btn:active {
+  transform: scale(0.98);
+}
+
+
+/* Hero Section */
+.hero {
+  text-align: center;
+  padding: 80px 20px 40px;
+}
+
+.hero h1 {
+  font-size: 3.5em;
+  color: #629ce8;
+  text-shadow: 0 0 20px #4fb5e1;
+  letter-spacing: 2px;
+  font-family: "Mountains of Christmas", serif;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.hero p {
+  font-size: 1.2em;
+  color: #eff0f0;
+  margin-top: 10px;
+  text-shadow: 0 0 5px #00e5ff;
+  font-family: "Marhey", sans-serif;
+  font-weight: 400;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Symmetric Cards Grid */
+.cards-grid-symmetric {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 40px;
+  padding: 60px 40px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Feature Cards */
+.card-symmetric {
+  background: rgba(0, 229, 255, 0.08);
+  border: 1px solid #054b52;
+  border-radius: 20px;
+  padding: 30px 25px;
+  text-align: center;
+  box-shadow: 0 0 30px rgba(0, 154, 171, 0.3);
+  backdrop-filter: blur(6px);
+  position: relative;
+  overflow: hidden;
+  font-family: "Marhey", sans-serif;
+  transition: all 0.3s ease;
+  animation: fadeInUp 0.6s ease-out forwards;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.card-symmetric:hover {
+  transform: scale(1.05) translateY(-10px);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+}
+
+.card-symmetric h3 {
+  color: #a6e6e6;
+  font-size: 1.4em;
+  margin-bottom: 15px;
+  text-shadow: 0 0 10px #03bed3;
+  font-family: "Marhey", sans-serif;
+  font-weight: 700;
+}
+
+.card-symmetric p {
+  color: #b2ebf2;
+  font-size: 0.95em;
+  line-height: 1.4em;
+  font-family: "Marhey", sans-serif;
+  font-weight: 400;
+  margin-bottom: 20px;
+}
+
+/* Card Button */
+.card-btn {
+  display: inline-block;
+  padding: 12px 24px;
+  background-color: transparent;
+  border: 2px solid #f2f5f6;
+  border-radius: 30px;
+  color: #d5d6d6;
+  font-weight: bold;
+  font-size: 1em;
+  font-family: "Mountains of Christmas", serif;
+  text-decoration: none;
+  text-shadow: 0 0 5px #076f7a;
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.1);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.card-btn:hover {
+  background-color: #0f9bab;
+  color: #000;
+  box-shadow: 0 0 25px #19bdcf;
+  text-decoration: none;
+}
+
+/* Daily Challenge Notification Styles */
+.daily-challenge-notification {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  z-index: 1000;
+  animation: slideInRight 0.5s ease-out;
+}
+
+.challenge-card {
+  position: relative;
+  background: transparent;
+  border-radius: 16px;
+  padding: 20px;
+  color: white;
+  min-width: 320px;
+  box-shadow: 
+    0 10px 30px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 0 50px rgba(102, 126, 234, 0.4);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.challenge-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+  transform: rotate(45deg);
+  animation: shimmer 3s infinite;
+}
+
+.challenge-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  position: relative;
+}
+
+.challenge-icon {
+  font-size: 24px;
+  margin-right: 10px;
+  animation: pulse 2s infinite;
+}
+
+.challenge-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  flex: 1;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.3s;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.close-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.challenge-content p {
+  margin: 0 0 15px 0;
+  opacity: 0.9;
+  font-size: 15px;
+}
+
+.challenge-stats {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+}
+
+.stat {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  backdrop-filter: blur(10px);
+}
+
+
+.challenge-actions {
+  display: flex;
+  gap: 10px;
+  position: relative;
+}
+
+.btn-remind, .btn-start {
+  flex: 1;
+  padding: 12px 15px;
+  background: transparent;
+  border: 2px solid #f2f5f6;
+  border-radius: 30px;
+  color: #d5d6d6;
+  font-weight: bold;
+  font-size: 14px;
+  font-family: "Mountains of Christmas", serif;
+  text-decoration: none;
+  text-shadow: 0 0 5px #076f7a;
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.1);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.btn-remind:hover, .btn-start:hover {
+  background-color: #0f9bab;
+  color: #000;
+  box-shadow: 0 0 25px #19bdcf;
+  transform: translateY(-2px);
+}
+
+
+
+
+.challenge-sparkle {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 20px;
+  height: 20px;
+  background: #ffd700;
+  border-radius: 50%;
+  animation: sparkle 2s infinite;
+  box-shadow: 0 0 20px #ffd700;
+}
+
+.challenge-sparkle::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  background: white;
+  border-radius: 50%;
+}
+
+/* Animations */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: rotate(45deg) translateX(-100%);
+  }
+  100% {
+    transform: rotate(45deg) translateX(100%);
+  }
+}
+
+@keyframes sparkle {
+  0%, 100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .daily-challenge-notification {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+  }
+  
+  .challenge-card {
+    min-width: auto;
+    width: 100%;
+  }
+  
+  .challenge-stats {
+    flex-direction: column;
+    gap: 5px;
+  }
+}
+
+/* Footer */
+.footer {
+  background: linear-gradient(to top, rgba(26, 35, 126, 0.8), transparent);
+  padding: 40px 20px 20px;
+  margin-top: 60px;
+}
+
+.footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 40px;
+  margin-bottom: 30px;
+}
+
+.footer-section h4 {
+  color: #0db0c3;
+  font-family: "Marhey", sans-serif;
+  font-weight: 700;
+  font-size: 1.2em;
+  margin-bottom: 15px;
+  text-shadow: 0 0 10px #128c9a;
+}
+
+.footer-links {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.footer-links li {
+  margin-bottom: 8px;
+}
+
+.footer-links a {
+  color: #b2ebf2;
+  text-decoration: none;
+  font-family: "Marhey", sans-serif;
+  font-weight: 400;
+  transition: all 0.3s ease;
+  text-shadow: 0 0 5px #14b3c4;
+}
+
+.footer-links a:hover {
+  color: #14a3b3;
+  text-shadow: 0 0 15px #29a2af;
+  padding-left: 5px;
+}
+
+.footer-bottom {
+  text-align: center;
+  padding-top: 20px;
+  border-top: 1px solid rgba(0, 229, 255, 0.3);
+}
+
+.footer-bottom p {
+  color: #90caf9;
+  font-size: 0.9em;
+  font-family: "Marhey", sans-serif;
+  margin: 0;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 0 1rem;
+  }
+
+  .nav {
+    gap: 1rem;
+  }
+
+  .hero h1 {
+    font-size: 2.5em;
+  }
+
+  .hero p {
+    font-size: 1.1em;
+  }
+
+  .cards-grid-symmetric {
+    grid-template-columns: 1fr;
+    padding: 40px 20px;
+    gap: 30px;
+  }
+
+  .footer-content {
+    grid-template-columns: 1fr;
+    gap: 30px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero h1 {
+    font-size: 2em;
+  }
+
+  .hero p {
+    font-size: 1em;
+  }
+
+  .card-symmetric {
+    padding: 20px 15px;
+  }
+
+  .card-symmetric h3 {
+    font-size: 1.2em;
+  }
+
+  .nav {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+/* Add these styles to your existing app.css */
+
+/* Roadmap Filter Specific Styles */
+.panel {
+  background: rgba(0, 229, 255, 0.08);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  border-radius: 20px;
+  padding: 30px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 0 30px rgba(0, 229, 255, 0.2);
+  margin: 30px 0;
+}
+
+.panel h2 {
+  color: #12a1b1;
+  font-family: "Marhey", sans-serif;
+  font-weight: 700;
+  font-size: 1.8em;
+  text-shadow: 0 0 10px #28c5d6;
+  margin-bottom: 25px;
+  text-align: center;
+}
+
+.opt {
+  background: rgba(0, 229, 255, 0.05);
+  border: 2px solid rgba(0, 229, 255, 0.3);
+  border-radius: 15px;
+  padding: 20px 16px;
+  color: #b2ebf2;
+  font-family: "Marhey", sans-serif;
+  font-weight: 400;
+  font-size: 1.1em;
+  text-shadow: 0 0 5px #10b8cb;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+
+.opt:hover {
+  background: rgba(0, 229, 255, 0.15);
+  border-color: #10b4c6;
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+.opt.selected {
+  background: rgba(0, 229, 255, 0.2);
+  border-color: #0abbcf;
+  box-shadow: 0 0 25px rgba(0, 229, 255, 0.6);
+  color: #14b8ca;
+}
+
+.opt span:first-child {
+  font-size: 1.8rem;
+  filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.6));
+}
+
+/* Button Styles for Roadmap Filter */
+.btn {
+  display: inline-block;
+  padding: 16px 40px;
+  background: transparent;
+  border: 2px solid #f2f5f6;
+  border-radius: 30px;
+  color: #3da1d4;
+  font-weight: bold;
+  font-size: 1.2em;
+  font-family: "Mountains of Christmas", serif;
+  text-decoration: none;
+  text-shadow: 0 0 5px #157f8a;
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.3);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  margin: 10px;
+}
+
+.btn.primary {
+  background: rgba(0, 229, 255, 0.1);
+  border-color: #00e5ff;
+  color: #eaeeef;
+}
+
+.btn:hover {
+  background-color: #1496a4;
+  color: #000;
+  box-shadow: 0 0 25px #11abbc;
+  transform: translateY(-2px);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn:disabled:hover {
+  background: transparent;
+  color: #3da1d4;
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.1);
+  transform: none;
+}
+
+/* Assessment Button Specific Style */
+.btn[style*="background: var(--ok)"] {
+  background: rgba(40, 167, 69, 0.2) !important;
+  border: 2px solid #28a745 !important;
+  color: #90f5a7 !important;
+  text-shadow: 0 0 5px #28a745 !important;
+  box-shadow: 0 0 15px rgba(40, 167, 69, 0.4) !important;
+}
+
+.btn[style*="background: var(--ok)"]:hover {
+  background: #28a745 !important;
+  color: #000 !important;
+  box-shadow: 0 0 25px #28a745 !important;
+}
+
+/* Helper text styles */
+p[style*="color: var(--muted)"] {
+  color: #90caf9 !important;
+  font-family: "Marhey", sans-serif;
+  text-shadow: 0 0 3px #00e5ff;
+}
+
+/* Link styles */
+a[style*="color: var(--brand)"] {
+  color: #00e5ff !important;
+  text-decoration: none;
+  font-family: "Marhey", sans-serif;
+  text-shadow: 0 0 5px #00e5ff;
+  transition: all 0.3s ease;
+}
+
+a[style*="color: var(--brand)"]:hover {
+  text-shadow: 0 0 15px #00e5ff;
+  padding-left: 5px;
+}
+
+/* Responsive adjustments for roadmap filter */
+@media (max-width: 768px) {
+  .panel {
+    padding: 20px;
+    margin: 20px 10px;
+  }
+  
+  .panel h2 {
+    font-size: 1.5em;
+  }
+  
+  .opt {
+    padding: 15px 12px;
+    font-size: 1em;
+  }
+  
+  .btn {
+    padding: 14px 30px;
+    font-size: 1.1em;
+    margin: 5px;
+  }
+}
+
+@media (max-width: 480px) {
+  .panel {
+    padding: 15px;
+  }
+  
+  .panel h2 {
+    font-size: 1.3em;
+  }
+  
+  .opt {
+    padding: 12px 10px;
+    font-size: 0.9em;
+  }
+  
+  .btn {
+    padding: 12px 25px;
+    font-size: 1em;
+  }
+}
+/* Add these styles to your app.css */
+
+/* Card Image Styles */
+/* Update these styles in your app.css */
+
+/* Card Image Styles */
+.card-image-container {
+  width: 100%;
+  height: 200px; /* Adjust based on heading + button height */
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 15px;
+  background: rgba(0, 229, 255, 0.05);
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  position: relative;
+}
+
+
+.card-image-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* Use contain to show full image without cropping */
+  transition: transform 0.3s ease;
+}
+
+.card-symmetric:hover .card-image {
+  transform: scale(1.05);
+}
+
+.card-image-fallback {
+  font-size: 4rem;
+  filter: drop-shadow(0 0 10px rgba(0, 229, 255, 0.6));
+}
+
+/* Remove description since we're using images */
+.card-symmetric p {
+  display: none;
+}
+
+/* Adjust card spacing for images */
+.card-symmetric {
+  max-width: 280px;
+  height: 400px; /* Reduce from default if it's taller */
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  text-align: center;
+}
+
+.card-symmetric h3 {
+  margin-bottom: 20px;
+  flex-grow: 0; /* Don't let title grow */
+}
+
+.card-btn {
+  flex-grow: 0; /* Don't let button grow */
+  margin-top: auto; /* Push button to bottom */
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .card-image-container {
+    width: 80%; /* Maintain 80% width on mobile */
+    height: 150px;
+  }
+  
+  .card-image-fallback {
+    font-size: 3rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .card-image-container {
+    width: 80%; /* Maintain 80% width on small mobile */
+    height: 120px;
+  }
+  
+  .card-image-fallback {
+    font-size: 2.5rem;
+  }
+}
+/* Projects Filter Specific Styles */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 30px;
+  padding: 40px 20px;
+}
+
+.card {
+  background: rgba(0, 229, 255, 0.08);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  border-radius: 20px;
+  padding: 20px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 0 30px rgba(0, 229, 255, 0.2);
+  transition: all 0.3s ease;
+  animation: fadeInUp 0.6s ease-out forwards;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.4);
+}
+
+.card-icon {
+  margin-bottom: 20px;
+}
+
+.card h3 {
+  color: #dce2e2;
+  font-size: 1.5em;
+  margin-bottom: 15px;
+  text-shadow: 0 0 10px #03bed3;
+  font-family: "Marhey", sans-serif;
+  font-weight: 700;
+}
+
+.card h4 {
+  color: #b2ebf2;
+  font-family: "Marhey", sans-serif;
+  font-weight: 400;
+}
+
+.card p {
+  color: #e4eced;
+  font-size: 1em;
+  line-height: 1.5;
+  font-family: "Marhey", sans-serif;
+  font-weight: 400;
+  margin-bottom: 20px;
+}
+
+/* Responsive adjustments for projects filter */
+@media (max-width: 768px) {
+  .cards-grid {
+    grid-template-columns: 1fr;
+    padding: 30px 15px;
+    gap: 25px;
+  }
+  
+  .card {
+    padding: 25px 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .cards-grid {
+    grid-template-columns: 1fr;
+    padding: 20px 10px;
+    gap: 20px;
+  }
+  
+  .card {
+    padding: 20px 15px;
+  }
+  
+  .card h3 {
+    font-size: 1.3em;
+  }
+}
+/* Add this to your CSS */
+.learn-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 30px;
+  padding: 40px 20px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+  .learn-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Badge styles for Profile page */
+.badge {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  min-width: 140px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.03);
+  color: #dbeef6;
+  text-align: center;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.35);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.badge:hover{ transform: translateY(-4px); box-shadow: 0 10px 30px rgba(0,0,0,0.45); }
+.badge-name{ font-weight:700; color: #eaf8ff; font-size: 14px; }
+.badge-sub{ font-size: 12px; color: rgba(255,255,255,0.75); margin-top:6px }
+
+/* Earned badge visual (same warm gradient as before) */
+.badge.earned{
+  background: linear-gradient(90deg,#ffd54a,#ff8a65);
+  color: #1b1b1b;
+  position: relative;
+  overflow: visible;
+}
+
+/* Sparkle animation */
+.sparkle::after{
+  content: '';
+  position: absolute;
+  top: -6px;
+  right: -10px;
+  width: 18px;
+  height: 18px;
+  background: radial-gradient(circle at 30% 30%, #fff 0%, rgba(255,255,255,0.6) 20%, rgba(255,255,255,0) 40%);
+  filter: drop-shadow(0 0 8px rgba(255,255,255,0.9));
+  transform: rotate(25deg) scale(0.9);
+  animation: sparkle 1.8s infinite ease-in-out;
+}
+
+@keyframes sparkle {
+  0% { opacity: 0; transform: translateY(0) scale(0.6) rotate(0deg); }
+  30% { opacity: 1; transform: translateY(-6px) scale(1) rotate(10deg); }
+  60% { opacity: 0.6; transform: translateY(-2px) scale(0.9) rotate(-8deg); }
+  100% { opacity: 0; transform: translateY(0) scale(0.6) rotate(0deg); }
+}
+
+/* Add a subtle inner glow for earned badges */
+.badge.earned::before{
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  box-shadow: 0 0 24px rgba(255,170,100,0.22) inset, 0 6px 20px rgba(255,120,90,0.06);
+  pointer-events: none;
+}

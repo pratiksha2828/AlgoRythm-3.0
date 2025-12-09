@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AlgoRythm - Authenticating</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      min-height: 100vh;
+      background: radial-gradient(ellipse at bottom, #1B2735 0%, #090A0F 100%);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    @keyframes twinkle {
+      0%, 100% { opacity: 0.3; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.2); }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-20px); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.1); opacity: 0.8; }
+    }
+
+    .space-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+    }
+
+    .stars {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+    }
+
+    .star {
+      position: absolute;
+      background: white;
+      border-radius: 50%;
+      animation: twinkle linear infinite;
+    }
+
+    .nebula {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(60px);
+      opacity: 0.3;
+      animation: float 20s ease-in-out infinite;
+    }
+
+    .nebula-1 {
+      top: 10%;
+      left: 15%;
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(138, 180, 248, 0.4), transparent);
+      animation-delay: 0s;
+    }
+
+    .nebula-2 {
+      bottom: 15%;
+      right: 20%;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(147, 112, 219, 0.3), transparent);
+      animation-delay: 3s;
+    }
+
+    .nebula-3 {
+      top: 50%;
+      left: 50%;
+      width: 500px;
+      height: 500px;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle, rgba(74, 144, 226, 0.2), transparent);
+      animation-delay: 6s;
+    }
+
+    .container {
+      text-align: center;
+      animation: float 6s ease-in-out infinite;
+      z-index: 10;
+      background: rgba(27, 39, 53, 0.6);
+      backdrop-filter: blur(10px);
+      padding: 60px 80px;
+      border-radius: 20px;
+      border: 2px solid rgba(138, 180, 248, 0.2);
+      box-shadow: 
+        0 0 40px rgba(138, 180, 248, 0.2),
+        0 0 80px rgba(138, 180, 248, 0.1),
+        inset 0 0 40px rgba(138, 180, 248, 0.05);
+    }
+
+    .icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 30px;
+      animation: pulse 2s ease-in-out infinite;
+      font-size: 60px;
+      line-height: 80px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 15px;
+      background: linear-gradient(135deg, #fff 0%, #8ab4f8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: 1px;
+    }
+
+    .message {
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 14px;
+      margin-bottom: 20px;
+      letter-spacing: 0.5px;
+    }
+
+    .loader {
+      width: 50px;
+      height: 50px;
+      margin: 20px auto;
+      border: 3px solid rgba(138, 180, 248, 0.2);
+      border-top: 3px solid #8ab4f8;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .tagline {
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 12px;
+      margin-top: 30px;
+      font-style: italic;
+      letter-spacing: 0.5px;
+    }
+
+    .checkmark {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      margin-right: 8px;
+      vertical-align: middle;
+      color: #4ade80;
+      animation: fadeIn 0.5s ease-in;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .status-list {
+      text-align: left;
+      display: inline-block;
+      margin: 20px 0;
+      font-size: 13px;
+      line-height: 1.8;
+    }
+
+    .status-item {
+      margin: 8px 0;
+      animation: slideIn 0.5s ease-out forwards;
+      opacity: 0;
+    }
+
+    .status-item:nth-child(1) { animation-delay: 0.3s; }
+    .status-item:nth-child(2) { animation-delay: 0.6s; }
+    .status-item:nth-child(3) { animation-delay: 0.9s; }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="space-bg">
+    <div class="nebula nebula-1"></div>
+    <div class="nebula nebula-2"></div>
+    <div class="nebula nebula-3"></div>
+    <div class="stars" id="stars"></div>
+  </div>
+
+  <div class="container">
+    <div class="icon">🚀</div>
+    <h1>Success! Authenticating...</h1>
+    <p class="message">Redirecting to dashboard</p>
+    
+    <div class="loader"></div>
+
+    <div class="status-list">
+      <div class="status-item">
+        <span class="checkmark">✓</span>
+        <span>GitHub authenticated</span>
+      </div>
+      <div class="status-item">
+        <span class="checkmark">✓</span>
+        <span>Session established</span>
+      </div>
+      <div class="status-item">
+        <span class="checkmark">✓</span>
+        <span>Preparing dashboard</span>
+      </div>
+    </div>
+
+    <p class="tagline">Built with passion for developers</p>
+  </div>
+
+  <script>
+    // Generate stars
+    const starsContainer = document.getElementById('stars');
+    
+    for (let i = 0; i < 80; i++) {
+      const star = document.createElement('div');
+      star.className = 'star';
+      star.style.left = `${Math.random() * 100}%`;
+      star.style.top = `${Math.random() * 100}%`;
+      star.style.width = `${Math.random() * 2 + 1}px`;
+      star.style.height = star.style.width;
+      star.style.animationDuration = `${Math.random() * 3 + 2}s`;
+      star.style.animationDelay = `${Math.random() * 3}s`;
+      starsContainer.appendChild(star);
+    }
+
+    // Auto-redirect after 2 seconds
+    // The backend will handle the actual redirect, but this is a fallback
+    setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+      const username = params.get('username');
+      
+      console.log('Redirecting with token:', token ? 'yes' : 'no', 'username:', username);
+      
+      if (token && username) {
+        // Store in sessionStorage before redirecting
+        sessionStorage.setItem('github_login_token', token);
+        sessionStorage.setItem('github_login_username', username);
+        sessionStorage.setItem('github_login_time', Date.now());
+      }
+      
+  // Redirect to the frontend login callback which will securely store tokens
+  const redirectUrl = `http://localhost:5173/login-callback?login_token=${encodeURIComponent(token || '')}&login_username=${encodeURIComponent(username || '')}`;
+      console.log('Redirecting to:', redirectUrl);
+      window.location.href = redirectUrl;
+    }, 2000);
+  </script>
+</body>
+</html>

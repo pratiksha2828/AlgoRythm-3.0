@@ -1,0 +1,590 @@
+/* AlgoRythm Refactor Code Styles - No Glow, White Borders */
+
+.algorhythm-refactor-wrap {
+  min-height: 100vh;
+  font-family: 'Marhey', sans-serif;
+  background-image: url('/images/Generate%20a%20cosmic%20sp.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  color: #e0f7fa;
+  overflow-x: hidden;
+}
+
+/* Header Styles */
+.algorhythm-refactor-header {
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+  padding: 1rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.algorhythm-refactor-header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 2rem;
+}
+
+.algorhythm-refactor-logo {
+  font-family: "Mountains of Christmas", serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #629ce8;
+  text-decoration: none;
+  /* Removed text-shadow */
+  letter-spacing: 1px;
+}
+
+.algorhythm-refactor-nav {
+  display: flex;
+  gap: 2rem;
+}
+
+.algorhythm-refactor-nav-link {
+  color: #b2ebf2;
+  text-decoration: none;
+  font-family: "Marhey", sans-serif;
+  font-weight: 400;
+  font-size: 1.1rem;
+  /* Removed text-shadow */
+  transition: all 0.3s ease;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+}
+
+.algorhythm-refactor-nav-link:hover {
+  color: #00e5ff;
+  /* Removed text-shadow */
+  background: rgba(0, 229, 255, 0.1);
+}
+
+/* Hero Section */
+.algorhythm-refactor-hero {
+  text-align: center;
+  padding: 80px 20px 40px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.algorhythm-refactor-hero-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.algorhythm-refactor-hero-title h1 {
+  font-size: 3.5em;
+  color: #629ce8;
+  /* Removed text-shadow */
+  letter-spacing: 2px;
+  font-family: "Mountains of Christmas", serif;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  margin: 0;
+}
+
+.algorhythm-refactor-hero-subtitle {
+  font-size: 1.2em;
+  color: #eff0f0;
+  margin-top: 10px;
+  /* Removed text-shadow */
+  font-family: "Marhey", sans-serif;
+  font-weight: 400;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.6;
+}
+
+.algorhythm-refactor-benefits {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 15px;
+  border-radius: 12px;
+  margin: 20px auto;
+  max-width: 600px;
+ 
+}
+
+.algorhythm-refactor-benefits strong {
+  color: #629ce8;
+  font-size: 1.1rem;
+}
+
+/* Info Button */
+.algorhythm-refactor-info-btn {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 2px solid #ffffff; /* White border */
+  background: rgba(255, 255, 255, 0.1);
+  /* Removed box-shadow */
+  margin-left: 8px;
+  z-index: 99999;
+  position: relative;
+  pointer-events: auto;
+  transition: all 0.3s ease;
+}
+
+.algorhythm-refactor-info-btn:hover {
+  transform: scale(1.05);
+  /* Removed box-shadow */
+}
+
+.algorhythm-refactor-info-icon {
+  color: #ffffff; /* White text */
+  font-weight: 900;
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Main Grid Layout */
+.algorhythm-refactor-main-grid {
+  max-width: 1200px;
+  margin: 40px auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  padding: 0 2rem;
+}
+
+/* Card Styles */
+.algorhythm-refactor-upload-card,
+.algorhythm-refactor-tips-card,
+.algorhythm-refactor-output-card,
+.algorhythm-refactor-practices-card {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid #ffffff; /* White border */
+  border-radius: 20px;
+  padding: 30px;
+  backdrop-filter: blur(6px);
+  /* Removed box-shadow */
+  margin-bottom: 20px;
+  animation: fadeInUp 0.6s ease-out forwards;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.algorhythm-refactor-card-title {
+  color: #a6e6e6;
+  font-size: 1.4em;
+  margin-bottom: 15px;
+  /* Removed text-shadow */
+  font-family: "Marhey", sans-serif;
+  font-weight: 700;
+}
+
+/* Form Styles */
+.algorhythm-refactor-form-group {
+  margin-bottom: 20px;
+}
+
+.algorhythm-refactor-form-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+  color: #b2ebf2;
+  font-family: "Marhey", sans-serif;
+}
+
+.algorhythm-refactor-select,
+.algorhythm-refactor-file-input,
+.algorhythm-refactor-code-textarea {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ffffff; /* White border */
+  background: #ffffff; /* White background for dropdown */
+  color: #000000; /* Black text for readability */
+  font-size: 0.95rem;
+  font-family: "Marhey", sans-serif;
+}
+
+.algorhythm-refactor-file-input {
+  border: 2px solid #ffffff; /* White dashed border */
+  text-align: center;
+  cursor: pointer;
+  background: rgba(0, 229, 255, 0.05); /* Keep light background for file input */
+  color: #e0f7fa; /* Light text for file input */
+}
+
+.algorhythm-refactor-code-textarea {
+  font-family: monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 200px;
+  background: rgba(0, 229, 255, 0.05); /* Keep light background for textarea */
+  color: #e0f7fa; /* Light text for textarea */
+}
+
+.algorhythm-refactor-monaco-editor {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #ffffff;
+}
+
+.algorhythm-refactor-file-name {
+  color: #90caf9;
+  margin-top: 8px;
+  font-size: 0.9rem;
+  font-family: "Marhey", sans-serif;
+}
+
+/* Button Styles */
+.algorhythm-refactor-primary-btn {
+  width: 100%;
+  padding: 15px;
+  background: rgba(0, 229, 255, 0.1);
+  border: 2px solid #ffffff; /* White border */
+  border-radius: 30px;
+  color: #ffffff; /* White text */
+  font-weight: bold;
+  font-size: 1.2em;
+  font-family: "Mountains of Christmas", serif;
+  text-decoration: none;
+  /* Removed text-shadow and box-shadow */
+  transition: all 0.3s ease;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+.algorhythm-refactor-primary-btn:hover:not(:disabled) {
+  background-color: #0f9bab;
+  color: #000;
+  /* Removed box-shadow */
+  transform: translateY(-2px);
+}
+
+.algorhythm-refactor-primary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.algorhythm-refactor-primary-btn:disabled:hover {
+  background: rgba(0, 229, 255, 0.1);
+  color: #ffffff;
+  transform: none;
+}
+
+.algorhythm-refactor-download-btn {
+  background: rgba(0, 229, 255, 0.1);
+  border: 2px solid #ffffff; /* White border */
+  border-radius: 30px;
+  color: #ffffff; /* White text */
+  font-weight: bold;
+  font-size: 0.8rem;
+  font-family: "Mountains of Christmas", serif;
+  text-decoration: none;
+  /* Removed text-shadow and box-shadow */
+  transition: all 0.3s ease;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+}
+
+.algorhythm-refactor-download-btn:hover {
+  background-color: #0f9bab;
+  color: #000;
+  transform: translateY(-2px);
+}
+
+/* Output Section */
+.algorhythm-refactor-output-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.algorhythm-refactor-code-output {
+  background: rgba(0, 229, 255, 0.05);
+  padding: 20px;
+  border-radius: 8px;
+  overflow: auto;
+  max-height: 400px;
+  font-family: monospace;
+  font-size: 14px;
+  line-height: 1.4;
+  border: 1px solid #ffffff; /* White border */
+  color: #e0f7fa;
+}
+
+/* Loading and Empty States */
+.algorhythm-refactor-loading-state,
+.algorhythm-refactor-empty-state {
+  text-align: center;
+  padding: 40px;
+  background: rgba(0, 229, 255, 0.05);
+  border-radius: 8px;
+  border: 2px solid #ffffff; /* White dashed border */
+}
+
+.algorhythm-refactor-loading-icon,
+.algorhythm-refactor-empty-icon {
+  font-size: 2rem;
+  margin-bottom: 15px;
+}
+
+.algorhythm-refactor-loading-subtext,
+.algorhythm-refactor-empty-subtext {
+  color: #90caf9;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  font-family: "Marhey", sans-serif;
+}
+
+/* Lists */
+.algorhythm-refactor-tips-list,
+.algorhythm-refactor-practices-list {
+  color: #b2ebf2;
+  padding-left: 20px;
+  font-family: "Marhey", sans-serif;
+}
+
+.algorhythm-refactor-tip-item,
+.algorhythm-refactor-practices-list li {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+/* Features Section */
+.algorhythm-refactor-features {
+  max-width: 1000px;
+  margin: 60px auto;
+  padding: 0 2rem;
+}
+
+.algorhythm-refactor-features-title {
+  text-align: center;
+  margin-bottom: 40px;
+  font-size: 2rem;
+  color: #629ce8;
+  /* Removed text-shadow */
+  font-family: "Mountains of Christmas", serif;
+  font-weight: 700;
+}
+
+.algorhythm-refactor-features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.algorhythm-refactor-feature-card {
+  text-align: center;
+  padding: 20px;
+  background: rgba(0, 229, 255, 0.08);
+  border: 1px solid #ffffff; /* White border */
+  border-radius: 20px;
+  backdrop-filter: blur(6px);
+  /* Removed box-shadow */
+  transition: all 0.3s ease;
+  animation: fadeInUp 0.6s ease-out forwards;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.algorhythm-refactor-feature-card:hover {
+  transform: translateY(-5px);
+}
+
+.algorhythm-refactor-feature-icon {
+  font-size: 2rem;
+  margin-bottom: 15px;
+}
+
+.algorhythm-refactor-feature-title {
+  color: #a6e6e6;
+  margin-bottom: 0.75rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-family: "Marhey", sans-serif;
+}
+
+.algorhythm-refactor-feature-desc {
+  color: #b2ebf2;
+  margin: 0;
+  line-height: 1.5;
+  font-family: "Marhey", sans-serif;
+}
+
+/* Modal Styles */
+.algorhythm-refactor-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999999;
+}
+
+.algorhythm-refactor-modal-content {
+  max-width: 720px;
+  width: 92%;
+  background: rgba(255,255,255,0.94);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+  color: rgba(10,10,10,0.95);
+}
+
+.algorhythm-refactor-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.algorhythm-refactor-modal-title {
+  margin: 0;
+  color: rgba(10,10,10,0.95);
+  font-family: "Marhey", sans-serif;
+  font-weight: 700;
+}
+
+.algorhythm-refactor-modal-close {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: rgba(50,50,50,0.85);
+}
+
+.algorhythm-refactor-modal-body {
+  margin-top: 12px;
+  color: rgba(50,50,50,0.85);
+  font-family: "Marhey", sans-serif;
+}
+
+.algorhythm-refactor-modal-text {
+  margin: 6px 0;
+  color: rgba(50,50,50,0.85);
+}
+
+.algorhythm-refactor-modal-list {
+  margin-left: 18px;
+  color: rgba(50,50,50,0.85);
+}
+
+.algorhythm-refactor-modal-list li {
+  margin-bottom: 0.5rem;
+}
+
+/* Footer */
+.algorhythm-refactor-footer {
+  background: linear-gradient(to top, rgba(26, 35, 126, 0.8), transparent);
+  padding: 40px 20px 20px;
+  margin-top: 60px;
+  border-top: 1px solid #ffffff; /* White border */
+}
+
+.algorhythm-refactor-footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 40px;
+  margin-bottom: 30px;
+}
+
+.algorhythm-refactor-footer-bottom {
+  text-align: center;
+  padding-top: 20px;
+  border-top: 1px solid #ffffff; /* White border */
+}
+
+.algorhythm-refactor-footer-bottom p {
+  color: #90caf9;
+  font-size: 0.9em;
+  font-family: "Marhey", sans-serif;
+  margin: 0;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .algorhythm-refactor-main-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 0 1rem;
+  }
+  
+  .algorhythm-refactor-hero-title {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .algorhythm-refactor-hero-title h1 {
+    font-size: 2.5em;
+  }
+  
+  .algorhythm-refactor-header-content {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 0 1rem;
+  }
+  
+  .algorhythm-refactor-nav {
+    gap: 1rem;
+  }
+  
+  .algorhythm-refactor-features-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .algorhythm-refactor-hero-subtitle {
+    font-size: 1.1em;
+  }
+}
+
+@media (max-width: 480px) {
+  .algorhythm-refactor-hero {
+    padding: 60px 15px 30px;
+  }
+  
+  .algorhythm-refactor-hero-title h1 {
+    font-size: 2em;
+  }
+  
+  .algorhythm-refactor-hero-subtitle {
+    font-size: 1em;
+  }
+  
+  .algorhythm-refactor-upload-card,
+  .algorhythm-refactor-output-card {
+    padding: 20px 15px;
+  }
+  
+  .algorhythm-refactor-modal-content {
+    padding: 1.5rem;
+  }
+  
+  .algorhythm-refactor-card-title {
+    font-size: 1.2em;
+  }
+}
