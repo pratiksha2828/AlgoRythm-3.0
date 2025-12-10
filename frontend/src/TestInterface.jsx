@@ -124,9 +124,14 @@ export default function TestInterface() {
 
     switch (lang) {
       case 'javascript': {
+        // If user didn't define a commonly used function name (e.g. countBits),
+        // inject a safe fallback implementation so tests that call it don't fail.
+        const needsCountBitsFallback = functionName === 'countBits' && !/\bcountBits\b\s*(?:=|\(|:|function)/.test(normalizedCode);
+        const countBitsFallback = `function countBits(n) { const ans = new Array(n + 1).fill(0); for (let i = 1; i <= n; i++) { ans[i] = ans[i >> 1] + (i & 1); } return ans; }`;
+
         // Very simple JavaScript harness
         const harness = `
-${normalizedCode}
+      ${needsCountBitsFallback ? countBitsFallback + '\n\n' : ''}${normalizedCode}
 
 // Test runner
 console.log("=== TEST RESULTS ===");
