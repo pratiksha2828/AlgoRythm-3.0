@@ -1459,6 +1459,10 @@ driver.quit()`,
               Start small • Focus on one feature at a time • Don't be afraid to break things • 
               Document your progress • Share your work with others
             </p>
+            <div className="footer-actions" style={{ marginTop: 18 }}>
+              <Link to="/faq" className="footer-button"><span className="icon">❓</span>FAQ</Link>
+              <Link to="/feedback" className="footer-button"><span className="icon">💬</span>Share Feedback</Link>
+            </div>
           </div>
         </div>
         

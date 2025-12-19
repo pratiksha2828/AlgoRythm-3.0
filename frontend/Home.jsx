@@ -108,13 +108,25 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-800 text-gray-400 text-center py-6 mt-auto">
-        <p>
-          © {new Date().getFullYear()} CodeCraf. All rights reserved. |
-          <Link to="/privacy" className="hover:text-white ml-1">
-            Privacy Policy
-          </Link>
-        </p>
+      <footer className="footer">
+        <div className="footer-content">
+          <div className="footer-section">
+            <div className="footer-actions">
+              <Link to="/faq" className="footer-button">
+                <span className="icon">❓</span>
+                FAQ
+              </Link>
+              <Link to="/feedback" className="footer-button">
+                <span className="icon">💬</span>
+                Share Feedback
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <div className="footer-bottom">
+          <p>© {new Date().getFullYear()} AlgoRythm. All rights reserved. Built with passion for developers.</p>
+        </div>
       </footer>
     </div>
   );

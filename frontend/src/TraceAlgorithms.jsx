@@ -364,6 +364,10 @@ export default function TraceAlgorithms() {
               Start with sorting algorithms • Use visualization tools • Practice implementation • 
               Analyze time complexity • Solve real problems
             </p>
+            <div className="footer-actions" style={{ marginTop: 18 }}>
+              <Link to="/faq" className="footer-button"><span className="icon">❓</span>FAQ</Link>
+              <Link to="/feedback" className="footer-button"><span className="icon">💬</span>Share Feedback</Link>
+            </div>
           </div>
         </div>
         <div className="footer-bottom">

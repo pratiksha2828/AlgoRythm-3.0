@@ -137,6 +137,10 @@ export default function LearnFilter() {
                 Browse all courses →
               </Link>
             </p>
+            <div className="footer-actions" style={{ marginTop: 18 }}>
+              <Link to="/faq" className="footer-button"><span className="icon">❓</span>FAQ</Link>
+              <Link to="/feedback" className="footer-button"><span className="icon">💬</span>Share Feedback</Link>
+            </div>
           </div>
         </div>
       </footer>

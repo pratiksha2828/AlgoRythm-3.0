@@ -849,7 +849,7 @@ const Streaks = () => {
                 <img
                   src={
                     card.type === "dailyChallengeStreak"
-                      ? "/images/dailyChallengeStreak.png"
+                      ? "/images/Screenshot 2025-12-10 085512.png"
                       : `/images/${card.type}.png`
                   }
                   alt={card.title}

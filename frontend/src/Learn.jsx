@@ -193,15 +193,11 @@ export default function Learn() {
 
       <footer className="footer">
   <div className="footer-content">
-    <div className="support-links">
-      <Link to="/faq" className="support-link">
-        <span className="support-link-icon">❓</span>
-        <span className="support-link-text">FAQ & Help Center</span>
-      </Link>
-      <Link to="/feedback" className="support-link">
-        <span className="support-link-icon">💬</span>
-        <span className="support-link-text">Share Feedback</span>
-      </Link>
+      <div className="support-links">
+      <div className="footer-actions">
+        <Link to="/faq" className="footer-button"><span className="icon">❓</span>FAQ</Link>
+        <Link to="/feedback" className="footer-button"><span className="icon">💬</span>Share Feedback</Link>
+      </div>
     </div>
   </div>
   

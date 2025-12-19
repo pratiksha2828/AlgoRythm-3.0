@@ -135,7 +135,7 @@ const handleStartChallenge = () => {
 
   const footerSections = [
   {
-    links: ["FAQ", "Feedback", "Help Center"]
+    links: ["FAQ", "Feedback"]
   }
 ];
 
@@ -315,15 +315,12 @@ const handleStartChallenge = () => {
       {/* Footer */}
       <footer className="footer">
         <div className="footer-content">
-          {footerSections.map(() => (
-            <div className="footer-section">
-              <ul className="footer-links">
-                <li><a href="/faq">FAQ</a></li>
-                <li><a href="/feedback">Feedback</a></li>
-                <li><a href="/help-center">Help Center</a></li>
-              </ul>
+          <div className="footer-section">
+            <div className="footer-actions">
+              <a href="/faq" className="footer-button"><span className="icon">❓</span>FAQ</a>
+              <a href="/feedback" className="footer-button"><span className="icon">💬</span>Share Feedback</a>
             </div>
-          ))}
+          </div>
         </div>
         
         <div className="footer-bottom">

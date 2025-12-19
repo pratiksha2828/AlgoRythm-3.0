@@ -2,6 +2,657 @@ import './app.css';
 import { Link, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
+import { parseInputString } from './utils/parseInputString.js';
+
+// Configuration Constants - Centralized for easy maintenance
+const CONFIG = {
+  // API Endpoints
+  OLLAMA_ENDPOINT: import.meta.env.VITE_OLLAMA_ENDPOINT || 'http://localhost:11434',
+  PISTON_API_ENDPOINT: import.meta.env.VITE_PISTON_API_ENDPOINT || 'https://emkc.org/api/v2/piston/execute',
+  
+  // Time limits (in seconds)
+  TEST_DURATION: 3600, // 60 minutes
+  
+  // Optimization thresholds
+  OPTIMIZATION_THRESHOLDS: {
+    EXCELLENT: 20,      // 0-20%: Excellent
+    GOOD: 50,           // 21-50%: Good
+    NEEDS_WORK: 80,     // 51-80%: Needs significant optimization
+    CRITICAL: 100       // 81-100%: Major optimization required
+  },
+  
+  // Pattern suggestion percentages
+  PATTERN_SUGGESTIONS: {
+    HASHMAP_SUBOPTIMAL: 25,     // HashMap when Boyer-Moore is better
+    QUADRATIC_SORT: 40,          // Bubble/insertion/selection sort
+    FIBONACCI_NO_MEMO: 75,       // Recursive Fibonacci without memoization
+  },
+  
+  // AI analysis settings
+  AI_SETTINGS: {
+    OPTIMAL_ALGORITHM_CAP: 5,    // Max % for optimal algorithms (0-5% for truly optimal code)
+    SUGGESTION_THRESHOLD: 0.6,    // Only suggest if AI < 60% of pattern suggestion
+    TEMPERATURE: 0.1,
+    TOP_P: 0.9,
+    DEFAULT_FALLBACK_PERCENTAGE: 50  // Default when AI fails
+  }
+};
+
+// Utility Functions - Extract common logic for reusability
+
+/**
+ * Creates the standardized AI optimization prompt
+ * @param {string} userCode - The code to analyze
+ * @param {string} language - Programming language
+ * @param {string} problem - Problem description
+ * @returns {string} - Formatted prompt for AI
+ */
+const createOptimizationPrompt = (userCode, language, problem) => {
+  return `Analyze this code and give ONLY a percentage (0-100%) for how much optimization is needed based on:
+1. Time complexity (O notation) - can it be better?
+2. Space complexity (O notation) - can it use less memory?
+3. Code efficiency and best practices
+4. Alternative approaches that are more optimal
+5. Memory usage and unnecessary operations
+6. Code readability and maintainability
+
+CRITICAL: For these specific optimal algorithms, ALWAYS give 0-10%:
+- Boyer-Moore Majority Vote: if code uses count=0, candidate variable, and increments/decrements count based on equality with candidate
+- Binary Search: if code uses while(low<=high) and mid=(low+high)/2
+- Hash Map solutions for O(n) problems like Two Sum
+- Tree/Graph Traversal: Recursive DFS/BFS for trees is optimal (O(n) time where n is nodes)
+- Subtree checking: Recursive comparison is the standard optimal approach
+- Note: Recursion is NOT inefficient for tree/graph problems where it's the natural solution
+
+IMPORTANT: For common algorithmic problems, recognize optimal solutions:
+- Majority Element: Boyer-Moore voting algorithm is optimal (O(n) time, O(1) space). Hash map solutions are suboptimal (50-60% due to O(n) space).
+- Binary Search: O(log n) time is optimal for sorted arrays
+- Two Sum: O(n) time with hash map is optimal
+- Linked Lists: Recursive solutions are natural and optimal for reversal, merging, etc.
+- Backtracking: Recursion is the standard optimal approach for permutations, combinations, subsets
+- Divide & Conquer: Recursive merge sort and quick sort are optimal
+- Dynamic Programming: Recursion with memoization is optimal and efficient
+- Fibonacci: Iterative O(n) OR recursive with memoization are both optimal; naive recursive O(2^n) is bad
+- Sorting: Built-in sort is acceptable unless custom implementation needed
+- Graph/Tree traversal: DFS/BFS with recursion are optimal
+
+PROBLEM: ${problem || 'General coding problem'}
+LANGUAGE: ${language}
+CODE: 
+\\\`${language}
+${userCode}
+\\\`
+
+Be strict but fair - if the algorithm is already optimal for the problem constraints, give low percentage (0-20%).
+Respond with ONLY a number between 0-100. Nothing else.`;
+};
+
+/**
+ * Calls Ollama API and extracts percentage from response
+ * @param {string} prompt - The prompt to send
+ * @returns {Promise<number>} - The extracted percentage (0-100)
+ */
+const callOllamaAPI = async (prompt) => {
+  const response = await fetch(`${CONFIG.OLLAMA_ENDPOINT}/api/generate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'mistral',
+      prompt: prompt,
+      stream: false,
+      options: {
+        temperature: CONFIG.AI_SETTINGS.TEMPERATURE,
+        top_p: CONFIG.AI_SETTINGS.TOP_P,
+      }
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Ollama error: ${response.status}`);
+  }
+
+  const result = await response.json();
+  const aiResponse = result.response.trim();
+  
+  console.log('Mistral raw response:', aiResponse);
+
+  // Extract percentage from response
+  const percentageMatch = aiResponse.match(/(\d+)%/);
+  let percentage = CONFIG.AI_SETTINGS.DEFAULT_FALLBACK_PERCENTAGE;
+  
+  if (percentageMatch) {
+    percentage = parseInt(percentageMatch[1]);
+  } else {
+    // Try to extract any number from response
+    const numberMatch = aiResponse.match(/\b(\d{1,3})\b/);
+    if (numberMatch) {
+      percentage = parseInt(numberMatch[1]);
+    }
+  }
+
+  // Ensure percentage is within bounds
+  return Math.max(0, Math.min(100, percentage));
+};
+
+/**
+ * Applies pattern-based adjustments to AI percentage
+ * @param {number} aiPercentage - AI-suggested percentage
+ * @param {string} userCode - User's code
+ * @param {string} problem - Problem description
+ * @returns {number} - Adjusted percentage
+ */
+const applyPatternAdjustments = (aiPercentage, userCode, problem, detectOptimalAlgorithms, getPatternSuggestions) => {
+  const { isOptimalAlgorithm } = detectOptimalAlgorithms(userCode, problem);
+  const patternSuggestion = getPatternSuggestions(userCode, problem);
+  
+  let adjustedPercentage = aiPercentage;
+  
+  // Apply logic: For optimal algorithms, cap at 0% to show excellence
+  if (isOptimalAlgorithm) {
+    adjustedPercentage = 0; // Optimal algorithms get 0% optimization needed
+    console.log(`✅ Optimal algorithm detected - setting optimization to 0%`);
+  } else if (patternSuggestion && aiPercentage < patternSuggestion.percentage * CONFIG.AI_SETTINGS.SUGGESTION_THRESHOLD) {
+    // Only log if AI is very lenient - informational only
+    console.log(`AI suggested ${aiPercentage}%, pattern suggests ${patternSuggestion.percentage}% (${patternSuggestion.reason}) - trusting AI`);
+  }
+  
+  return adjustedPercentage;
+};
+
+/**
+ * Generates feedback based on optimization percentage
+ * @param {number} percentage - Optimization percentage (0-100)
+ * @returns {Object} - Feedback object with feedback and suggestions
+ */
+const generateOptimizationFeedback = (percentage) => {
+  let feedback = '';
+  let suggestions = '';
+  
+  if (percentage === 0) {
+    feedback = '🌟 Perfect! Your algorithm is optimal with best time/space complexity.';
+    suggestions = 'Your solution demonstrates optimal algorithmic approach. Excellent work!';
+  } else if (percentage <= CONFIG.OPTIMIZATION_THRESHOLDS.EXCELLENT) {
+    feedback = '🟢 Excellent! Your code is highly optimized.';
+    suggestions = 'Minimal changes needed. Focus on maintaining this quality.';
+  } else if (percentage <= CONFIG.OPTIMIZATION_THRESHOLDS.GOOD) {
+    feedback = '🟡 Good code with some optimization opportunities.';
+    suggestions = 'Consider minor refactoring for better performance and readability.';
+  } else if (percentage <= CONFIG.OPTIMIZATION_THRESHOLDS.NEEDS_WORK) {
+    feedback = '🟠 Code needs significant optimization.';
+    suggestions = 'Refactor for better algorithms, reduce complexity, and improve efficiency.';
+  } else {
+    feedback = '🔴 Major optimization required!';
+    suggestions = 'Complete rewrite recommended. Focus on algorithm efficiency and code structure.';
+  }
+  
+  return { feedback, suggestions };
+};
+
+// Code Preparation Utilities - Extract common logic
+
+/**
+ * Normalizes line endings to Unix-style
+ */
+const normalizeLineEndings = (s) => (typeof s === 'string' ? s.replace(/\r\n/g, '\n') : s || '');
+
+/**
+ * Extracts function name from code
+ */
+const extractFunctionName = (code, language) => {
+  let functionName = 'solution';
+  
+  if (language === 'python') {
+    const funcMatch = code.match(/(?:async\s+)?def\s+([A-Za-z_]\w*)\s*\(/);
+    if (funcMatch) functionName = funcMatch[1];
+  } else if (language === 'javascript') {
+    const exportFunc = code.match(/export\s+(?:default\s+)?(?:async\s+)?function\s+([A-Za-z_]\w*)\s*\(/);
+    const funcDecl = code.match(/(?:async\s+)?function\s+([A-Za-z_]\w*)\s*\(/);
+    const constDecl = code.match(/(?:const|let|var)\s+([A-Za-z_]\w*)\s*=\s*(?:async\s*)?\s*(?:function|\()/);
+    const arrowFunc = code.match(/(?:const|let|var)\s+([A-Za-z_]\w*)\s*=\s*(?:async\s*)?\s*[^=]*=>/);
+    const classMethod = code.match(/(?:async\s+)?([A-Za-z_]\w*)\s*\([^)]*\)\s*\{/);
+    
+    if (exportFunc) functionName = exportFunc[1];
+    else if (funcDecl) functionName = funcDecl[1];
+    else if (constDecl) functionName = constDecl[1];
+    else if (arrowFunc) functionName = arrowFunc[1];
+    else if (classMethod && !['if', 'while', 'for', 'switch', 'catch'].includes(classMethod[1])) 
+      functionName = classMethod[1];
+  } else if (language === 'java') {
+    const javaMethod = code.match(/(?:public|private|protected)?\s+(?:static\s+)?\w+(?:<[^>]+>)?(?:\[\])?\s+([A-Za-z_]\w*)\s*\(/);
+    if (javaMethod) functionName = javaMethod[1];
+  }
+  
+  return functionName;
+};
+
+/**
+ * Validates test case structure
+ */
+const validateTestCases = (testCases) => {
+  if (!testCases || testCases.length === 0) {
+    console.warn('No test cases found in question data');
+    return [];
+  }
+  
+  const validTestCases = testCases.filter(tc => {
+    if (!tc || typeof tc !== 'object') return false;
+    if (!('input' in tc) || !('expected' in tc)) return false;
+    return true;
+  });
+  
+  if (validTestCases.length === 0) {
+    console.warn('No valid test cases found (missing input or expected fields)');
+  }
+  
+  return validTestCases;
+};
+
+/**
+ * Checks if problem involves trees or linked lists
+ */
+const isTreeOrLinkedListProblem = (questionData, code) => {
+  return /tree|node|root|left|right|head|next|listnode/i.test(questionData?.problem || '') ||
+         /tree|node|root|left|right|head|next|listnode/i.test(code || '');
+};
+
+/**
+ * Helper to process test case input and generate assignments
+ */
+const processTestInput = (rawInput, isTreeOrLinkedList, language = 'javascript') => {
+  const assignments = [];
+  const funcArgs = [];
+  const parts = parseInputString(rawInput);
+  
+  parts.forEach(part => {
+    const trimmed = part.trim();
+    if (!trimmed) return;
+    
+    const varMatch = trimmed.match(/^(\w+)\s*=\s*(.+)$/);
+    if (varMatch && isTreeOrLinkedList) {
+      const varName = varMatch[1];
+      const value = varMatch[2];
+      
+      if (/root|tree/i.test(varName)) {
+        const buildFunc = language === 'python' ? 'build_tree' : 'buildTree';
+        assignments.push(`${varName} = ${buildFunc}(${value})`);
+        funcArgs.push(varName);
+        return;
+      } else if (/head|list|l1|l2/i.test(varName)) {
+        const buildFunc = language === 'python' ? 'build_list' : 'buildList';
+        assignments.push(`${varName} = ${buildFunc}(${value})`);
+        funcArgs.push(varName);
+        return;
+      }
+    }
+    
+    // Default handling
+    if (language === 'python') {
+      const sanitized = trimmed.replace(/([a-zA-Z_][a-zA-Z0-9_]*)\s+([a-zA-Z_])/g, '$1_$2');
+      assignments.push(sanitized);
+      const varName = sanitized.split('=')[0].trim();
+      if (varName) funcArgs.push(varName);
+    } else {
+      const sanitized = trimmed.replace(/([a-zA-Z_$][a-zA-Z0-9_$]*)\s+([a-zA-Z_$])/g, '$1_$2');
+      assignments.push(sanitized);
+      const varName = sanitized.split('=')[0].trim();
+      if (varName) funcArgs.push(varName);
+    }
+  });
+  
+  return { assignments, funcArgs };
+};
+
+/**
+ * Tree and List helper code for JavaScript
+ */
+const getJavaScriptHelpers = () => ({
+  treeNode: `
+class TreeNode {
+  constructor(val, left = null, right = null) {
+    this.val = val;
+    this.left = left;
+    this.right = right;
+  }
+}
+
+function buildTree(arr) {
+  if (!arr || arr.length === 0) return null;
+  const root = new TreeNode(arr[0]);
+  const queue = [root];
+  let i = 1;
+  while (queue.length > 0 && i < arr.length) {
+    const node = queue.shift();
+    if (i < arr.length && arr[i] !== null) {
+      node.left = new TreeNode(arr[i]);
+      queue.push(node.left);
+    }
+    i++;
+    if (i < arr.length && arr[i] !== null) {
+      node.right = new TreeNode(arr[i]);
+      queue.push(node.right);
+    }
+    i++;
+  }
+  return root;
+}
+
+function treeToArray(root) {
+  if (!root) return [];
+  const result = [];
+  const queue = [root];
+  while (queue.length > 0) {
+    const node = queue.shift();
+    if (node) {
+      result.push(node.val);
+      queue.push(node.left);
+      queue.push(node.right);
+    } else {
+      result.push(null);
+    }
+  }
+  while (result.length > 0 && result[result.length - 1] === null) {
+    result.pop();
+  }
+  return result;
+}
+`,
+  listNode: `
+class ListNode {
+  constructor(val, next = null) {
+    this.val = val;
+    this.next = next;
+  }
+}
+
+function buildList(arr) {
+  if (!arr || arr.length === 0) return null;
+  const dummy = new ListNode(0);
+  let current = dummy;
+  for (const val of arr) {
+    current.next = new ListNode(val);
+    current = current.next;
+  }
+  return dummy.next;
+}
+`
+});
+
+/**
+ * Tree and List helper code for Python
+ */
+const getPythonHelpers = () => `
+class TreeNode:
+    def __init__(self, val=0, left=None, right=None):
+        self.val = val
+        self.left = left
+        self.right = right
+
+def build_tree(arr):
+    if not arr:
+        return None
+    root = TreeNode(arr[0])
+    queue = [root]
+    i = 1
+    while queue and i < len(arr):
+        node = queue.pop(0)
+        if i < len(arr) and arr[i] is not None:
+            node.left = TreeNode(arr[i])
+            queue.append(node.left)
+        i += 1
+        if i < len(arr) and arr[i] is not None:
+            node.right = TreeNode(arr[i])
+            queue.append(node.right)
+        i += 1
+    return root
+
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val = val
+        self.next = next
+
+def build_list(arr):
+    if not arr:
+        return None
+    dummy = ListNode(0)
+    current = dummy
+    for val in arr:
+        current.next = ListNode(val)
+        current = current.next
+    return dummy.next
+
+def tree_to_array(root):
+    if not root:
+        return []
+    result = []
+    queue = [root]
+    while queue:
+        node = queue.pop(0)
+        if node:
+            result.append(node.val)
+            queue.append(node.left)
+            queue.append(node.right)
+        else:
+            result.append(None)
+    while result and result[-1] is None:
+        result.pop()
+    return result
+`;
+
+/**
+ * Helper to get C/C++ headers and utilities
+ */
+const getCCPPHelpers = () => `
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+#include <math.h>
+
+#define MAX_SIZE 10000
+#define MAX_STRING_SIZE 1000
+
+// Helper function to parse integer array from string like "[1,2,3]"
+int* parseIntArray(const char* input, int* size) {
+    static int arr[MAX_SIZE];
+    *size = 0;
+    const char* ptr = input;
+    
+    // Skip opening bracket
+    while (*ptr && (*ptr == '[' || *ptr == ' ')) ptr++;
+    
+    while (*ptr && *ptr != ']') {
+        if (*ptr == ',' || *ptr == ' ') {
+            ptr++;
+            continue;
+        }
+        // Handle negative numbers
+        int sign = 1;
+        if (*ptr == '-') {
+            sign = -1;
+            ptr++;
+        }
+        if (*ptr >= '0' && *ptr <= '9') {
+            arr[(*size)++] = sign * atoi(ptr);
+            while (*ptr && *ptr != ',' && *ptr != ']') ptr++;
+        } else {
+            ptr++;
+        }
+    }
+    return arr;
+}
+
+// Helper to parse string from input like ""hello""
+char* parseString(const char* input) {
+    static char str[MAX_STRING_SIZE];
+    int i = 0;
+    const char* ptr = input;
+    
+    // Skip quotes and whitespace
+    while (*ptr && (*ptr == '"' || *ptr == '\\'' || *ptr == ' ')) ptr++;
+    
+    // Copy string content
+    while (*ptr && *ptr != '"' && *ptr != '\\'' && i < MAX_STRING_SIZE - 1) {
+        str[i++] = *ptr++;
+    }
+    str[i] = '\\0';
+    return str;
+}
+
+// Helper to print integer array
+void printIntArray(int* arr, int size) {
+    printf("[");
+    for (int i = 0; i < size; i++) {
+        printf("%d", arr[i]);
+        if (i < size - 1) printf(",");
+    }
+    printf("]");
+}
+
+// Helper to print string
+void printString(const char* str) {
+    printf("%s", str);
+}
+
+// Helper to compare integer arrays
+bool compareIntArrays(int* arr1, int size1, int* arr2, int size2) {
+    if (size1 != size2) return false;
+    for (int i = 0; i < size1; i++) {
+        if (arr1[i] != arr2[i]) return false;
+    }
+    return true;
+}
+
+// Helper to compare strings
+bool compareStrings(const char* str1, const char* str2) {
+    return strcmp(str1, str2) == 0;
+}
+
+// TreeNode structure for binary tree problems
+struct TreeNode {
+    int val;
+    struct TreeNode* left;
+    struct TreeNode* right;
+};
+
+// Create new tree node
+struct TreeNode* createNode(int val) {
+    struct TreeNode* node = (struct TreeNode*)malloc(sizeof(struct TreeNode));
+    node->val = val;
+    node->left = NULL;
+    node->right = NULL;
+    return node;
+}
+
+// ListNode structure for linked list problems
+struct ListNode {
+    int val;
+    struct ListNode* next;
+};
+
+// Create new list node
+struct ListNode* createListNode(int val) {
+    struct ListNode* node = (struct ListNode*)malloc(sizeof(struct ListNode));
+    node->val = val;
+    node->next = NULL;
+    return node;
+}
+`;
+
+/**
+ * Helper function to detect optimal algorithms (reduces duplication between AI functions)
+ */
+const detectOptimalAlgorithms = (userCode, problem) => {
+  // Language-agnostic optimal algorithm detection
+  const isBoyerMoore = ((/(?:\$?count|\b(?:int|Integer|var|let|const|let\s+mut)\s+count)\s*(?:=|:=)\s*0/i.test(userCode)) || /count\s*(?:=|:=)\s*0/i.test(userCode))
+          && /\$?candidate|candidate/i.test(userCode) &&
+          (/(?:\$?count\s*\+\+|\$?count\s*--|\$?count\s*[+-]=\s*1|\$?count\s*\+\s*=\s*[^;]*==\s*\$?candidate|\$?count\s*\+\s*=\s*1\s+if\s+[^;]*==\s*\$?candidate\s+else\s+-1)/i.test(userCode));
+  const isBinarySearch = /while\s*\(?\s*\w+\s*<=\s*\w+\s*\)?/i.test(userCode) && 
+                        (/Math\.floor\s*\(\s*\(\s*\w+\s*\+\s*\w+\s*\)\s*\/\s*2\s*\)|\w+\s*=\s*parseInt\s*\(\s*\(\s*\w+\s*\+\s*\w+\s*\)\s*\/\s*2\s*\)|\w+\s*=\s*Math\.floor\s*\(\s*\(\s*\w+\s*\+\s*\w+\s*\)\s*\/\s*2\s*\)|\w+\s*=\s*\w+\s*\+\s*\(\s*\w+\s*-\s*\w+\s*\)\s*\/\s*2|\w+\s*=\s*\(\s*\w+\s*\+\s*\w+\s*\)\s*\/\/\s*2|\w+\s*=\s*\(\s*\w+\s*\+\s*\w+\s*\)\s*\/\s*2/i.test(userCode));
+  
+  const isBuiltInSort = (/(?:\w+\.sort\b|\w+\.sort\s*\(|\bArrays\.sort\b|\bsorted\s*\(|\bsort\s*\(|sort\.Ints\s*\()/i.test(userCode)) && !/bubble|insertion|selection|merge|quick/i.test(userCode);
+  
+  const isOptimalHashMap = problem && (
+    problem.toLowerCase().includes('two sum') ||
+    problem.toLowerCase().includes('two numbers') ||
+    problem.toLowerCase().includes('contains duplicate') ||
+    problem.toLowerCase().includes('subarray sum')
+  ) && /new\s+Map\(|unordered_map|HashMap|Map\s*<|Dictionary\b|map\s*\[|array\s*\(|\$?\w+\s*:=\s*map|\$?cnt\s*\[|\bcount\s*\[|\$?count\s*=\s*\{\}|count\.get|count\[|\.getOrDefault|\.put|\.count/i.test(userCode);
+  
+  const isFloodFillDFS = problem && problem.toLowerCase().includes('flood') &&
+    (/def\s+floodFill|function\s+floodFill|public\s+int\[\]\[\]\s+floodFill|def\s+\w+\s*\([^)]*\)\s*:\s*[\s\S]*image[\s\S]*sr[\s\S]*sc[\s\S]*newColor/i.test(userCode) ||
+     /class\s+Solution[\s\S]*def\s+floodFill/i.test(userCode)) &&
+    /def\s+dfs|function\s+dfs|private\s+void\s+dfs/i.test(userCode) &&
+    /r\s*[<>]=?\s*R|r\s*[<>]=?\s*len\(image\)|r\s*[<>]=?\s*image\.length/i.test(userCode) &&
+    /c\s*[<>]=?\s*C|c\s*[<>]=?\s*len\(image\[0\]\)|c\s*[<>]=?\s*image\[0\]\.length/i.test(userCode) &&
+    /image\[r\]\[c\]\s*!=?\s*originalColor|image\[r\]\[c\]\s*!=?\s*\w+/i.test(userCode) &&
+    /dfs\(r\s*[+-]\s*1,\s*c\)|dfs\(r,\s*c\s*[+-]\s*1\)/i.test(userCode);
+  
+  const isTreeProblem = /tree|node|root|left|right|subtree/i.test(userCode) || (problem && /tree|node|subtree/i.test(problem));
+  const isOptimalTreeTraversal = isTreeProblem && 
+    /\b([a-zA-Z_][\w]*)\s*\([^)]*\)\s*\{[\s\S]*\b\1\s*\(/.test(userCode) &&
+    (/\.left|\['left'\]|\["left"\]/i.test(userCode) || /\.right|\['right'\]|\["right"\]/i.test(userCode));
+  
+  const isLinkedListProblem = /head|next|ListNode|linkedlist|linked list/i.test(userCode) || (problem && /linked list|listnode/i.test(problem));
+  const isOptimalLinkedList = isLinkedListProblem && /\b([a-zA-Z_][\w]*)\s*\([^)]*\)\s*\{[\s\S]*\b\1\s*\(/.test(userCode);
+  
+  const isBacktrackingProblem = /backtrack|permutation|combination|subset/i.test(userCode) || (problem && /permutation|combination|subset|backtrack/i.test(problem));
+  const isOptimalBacktracking = isBacktrackingProblem && /\b([a-zA-Z_][\w]*)\s*\([^)]*\)\s*\{[\s\S]*\b\1\s*\(/.test(userCode);
+  
+  const hasMemoization = /memo|cache|dp|dynamic/i.test(userCode);
+  const isOptimalDPWithMemo = /\b([a-zA-Z_][\w]*)\s*\([^)]*\)\s*\{[\s\S]*\b\1\s*\(/.test(userCode) && hasMemoization;
+  
+  return {
+    isBoyerMoore,
+    isBinarySearch,
+    isBuiltInSort,
+    isOptimalHashMap,
+    isFloodFillDFS,
+    isOptimalTreeTraversal,
+    isOptimalLinkedList,
+    isOptimalBacktracking,
+    isOptimalDPWithMemo,
+    isOptimalAlgorithm: isBoyerMoore || isBinarySearch || isBuiltInSort || isOptimalHashMap || isFloodFillDFS || 
+                       isOptimalTreeTraversal || isOptimalLinkedList || isOptimalBacktracking || isOptimalDPWithMemo
+  };
+};
+
+/**
+ * Helper function to get pattern-based suggestions (used by both AI functions)
+ */
+const getPatternSuggestions = (userCode, problem) => {
+  // Majority element with hash map (suboptimal - Boyer-Moore is better)
+  if (problem && problem.toLowerCase().includes('majority') &&
+      (/new\s+Map\(|unordered_map|HashMap|Map\s*<|Dictionary\b|map\s*\[|array\s*\(|\$?\w+\s*:=\s*map|\$?cnt\s*\[|\bcount\s*\[|\$?count\s*=\s*\{\}|count\.get|count\[|\.getOrDefault|\.put|\.count/i.test(userCode) ||
+       /Map\.set|Map\.get|\.hasOwnProperty|Object\.keys|for.*in.*(count|cnt|\w+)/i.test(userCode))) {
+    return { 
+      percentage: CONFIG.PATTERN_SUGGESTIONS.HASHMAP_SUBOPTIMAL, 
+      reason: 'HashMap works but Boyer-Moore is optimal' 
+    };
+  }
+  
+  // Quadratic sorting algorithms
+  if (/bubble|insertion|selection/i.test(userCode) && /sort/i.test(userCode)) {
+    return { 
+      percentage: CONFIG.PATTERN_SUGGESTIONS.QUADRATIC_SORT, 
+      reason: 'Quadratic sorting is inefficient' 
+    };
+  }
+  
+  // Recursive Fibonacci without memoization
+  const isRecursiveFibo = ((/fibonacci?\s*\(\s*\$?n\s*-\s*1\s*\)\s*\+\s*fibonacci?\s*\(\s*\$?n\s*-\s*2\s*\)/i.test(userCode) || 
+                           /return\s+fibonacci?\s*\(\s*\$?n\s*-\s*1\s*\)\s*\+\s*fibonacci?\s*\(\s*\$?n\s*-\s*2\s*\)/i.test(userCode))) && 
+                           !/memo|cache|dp|dynamic/i.test(userCode);
+  if (problem && problem.toLowerCase().includes('fibonacci') && isRecursiveFibo) {
+    return { 
+      percentage: CONFIG.PATTERN_SUGGESTIONS.FIBONACCI_NO_MEMO, 
+      reason: 'Exponential complexity is critical' 
+    };
+  }
+  
+  return null; // No pattern suggestion
+};
 
 export default function TestInterface() {
   const location = useLocation();
@@ -15,7 +666,7 @@ export default function TestInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [language, setLanguage] = useState('javascript');
-  const [timeLeft, setTimeLeft] = useState(3600); // 60 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(CONFIG.TEST_DURATION);
   const [testQuestions, setTestQuestions] = useState([]);
   const [currentQuestionData, setCurrentQuestionData] = useState(null);
   const [submissionResult, setSubmissionResult] = useState(null);
@@ -54,10 +705,9 @@ export default function TestInterface() {
     }
   }, [timeLeft, testCompleted]);
 
-  // Helper function to prepare code for execution with test cases
+  // Helper function to prepare code for execution with test cases (Refactored)
   const prepareCodeForExecution = (code, lang, questionData) => {
-    // Normalize line endings and preserve original spacing/indentation
-    const normalizeLineEndings = (s) => (typeof s === 'string' ? s.replace(/\r\n/g, '\n') : s || '');
+    // Use utility functions
     const userCodeRaw = normalizeLineEndings(code);
     
     // Normalize indentation: convert tabs to spaces (4 for Python, 2 for others)
@@ -67,44 +717,39 @@ export default function TestInterface() {
     // Trim trailing whitespace from each line
     normalizedCode = normalizedCode.split('\n').map(line => line.trimEnd()).join('\n');
     
-    // Derive the function name from the provided function signature robustly for both JS and Python
-    let functionName = 'solution';
+    // Extract function name using utility
+    let functionName = extractFunctionName(normalizedCode, lang);
     
-    // For Python, extract the actual function name from the code to handle cases where user doesn't follow the signature
-    if (lang === 'python') {
-      const funcMatch = normalizedCode.match(/def\s+([A-Za-z_]\w*)\s*\(/);
-      if (funcMatch) functionName = funcMatch[1];
-    }
-    
-    try {
-      const sig = (questionData && questionData.functionSignature) || '';
-      if (lang === 'python') {
-        const m = sig.match(/def\s+([A-Za-z_]\w*)/);
-        if (m) functionName = m[1];
-      } else {
-        // JavaScript / other C-like: try multiple patterns (function declaration, const/let/var assignment, arrow functions)
-        const m1 = sig.match(/function\s+([A-Za-z_]\w*)/);
-        const m2 = sig.match(/(?:const|let|var)\s+([A-Za-z_]\w*)\s*=\s*(?:async\s*)?\(/);
-        const m3 = sig.match(/([A-Za-z_]\w*)\s*=\s*\([^)]\)\s=>/);
-        if (m1) functionName = m1[1];
-        else if (m2) functionName = m2[1];
-        else if (m3) functionName = m3[1];
-        else {
-          // Fallback: pick a bare identifier before '(' if present
-          const m4 = sig.match(/([A-Za-z_]\w*)\s*\(/);
-          if (m4) functionName = m4[1];
+    // FALLBACK: If no function found in code, try to extract from signature
+    if (functionName === 'solution') {
+      try {
+        const sig = (questionData && questionData.functionSignature) || '';
+        if (lang === 'python') {
+          const m = sig.match(/def\s+([A-Za-z_]\w*)/);
+          if (m) functionName = m[1];
+        } else {
+          const m1 = sig.match(/function\s+([A-Za-z_]\w*)/);
+          const m2 = sig.match(/(?:const|let|var)\s+([A-Za-z_]\w*)\s*=\s*(?:async\s*)?\(/);
+          const m3 = sig.match(/([A-Za-z_]\w*)\s*=\s*\([^)]\)\s=>/);
+          if (m1) functionName = m1[1];
+          else if (m2) functionName = m2[1];
+          else if (m3) functionName = m3[1];
+          else {
+            const m4 = sig.match(/([A-Za-z_]\w*)\s*\(/);
+            if (m4) functionName = m4[1];
+          }
         }
+      } catch (e) {
+        console.warn('Failed to parse function signature for tests:', e);
       }
-    } catch (e) {
-      // keep default
-      console.warn('Failed to parse function signature for tests:', e);
     }
     
     const testCases = (questionData && questionData.testCases) || [];
     
-    // Defensive: if no test cases, return just the code
-    if (!testCases || testCases.length === 0) {
-      console.warn('No test cases found in question data');
+    // Validate test cases using utility
+    const validTestCases = validateTestCases(testCases);
+    
+    if (validTestCases.length === 0) {
       return normalizeLineEndings(code);
     }
 
@@ -124,6 +769,13 @@ export default function TestInterface() {
 
     switch (lang) {
       case 'javascript': {
+        // Check if this is a tree or linked list problem using utility
+        const isTreeOrLinkedListProblemFlag = isTreeOrLinkedListProblem(questionData, normalizedCode);
+        
+        // Get helpers using utility functions
+        const helpers = getJavaScriptHelpers();
+        const dataStructureHelpers = isTreeOrLinkedListProblemFlag ? (helpers.treeNode + helpers.listNode) : '';
+        
         // If user didn't define a commonly used function name (e.g. countBits),
         // inject a safe fallback implementation so tests that call it don't fail.
         const needsCountBitsFallback = functionName === 'countBits' && !/\bcountBits\b\s*(?:=|\(|:|function)/.test(normalizedCode);
@@ -131,11 +783,11 @@ export default function TestInterface() {
 
         // Very simple JavaScript harness
         const harness = `
-      ${needsCountBitsFallback ? countBitsFallback + '\n\n' : ''}${normalizedCode}
+      ${dataStructureHelpers}${needsCountBitsFallback ? countBitsFallback + '\n\n' : ''}${normalizedCode}
 
 // Test runner
 console.log("=== TEST RESULTS ===");
-${testCases.map((testCase, index) => {
+${validTestCases.map((testCase, index) => {
   const rawInput = typeof testCase.input === 'string' ? testCase.input : '';
   let expected = testCase.expected;
   
@@ -145,66 +797,41 @@ ${testCases.map((testCase, index) => {
     if (lower === 'true') expected = true;
     else if (lower === 'false') expected = false;
     else {
-      try { expected = JSON.parse(expected); } catch (e) { void e; }
+      try { 
+        expected = JSON.parse(expected); 
+      } catch (e) { 
+        console.warn('Failed to parse expected value as JSON:', expected, e.message); 
+      }
     }
   }
   
-  // Parse input to extract variable assignments and function arguments
-  const assignments = [];
-  const funcArgs = [];
+  // Use utility function to process test input
+  const { assignments, funcArgs } = processTestInput(rawInput, isTreeOrLinkedListProblemFlag, 'javascript');
   
-  // Function to split by comma only outside quotes and brackets
-  const splitByCommaOutsideBrackets = (str) => {
-    const parts = [];
-    let current = '';
-    let inString = false;
-    let quoteChar = '';
-    let bracketDepth = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str[i];
-      if (!inString && bracketDepth === 0 && char === ',') {
-        parts.push(current.trim());
-        current = '';
-      } else {
-        current += char;
-        if (!inString && (char === '"' || char === "'")) {
-          inString = true;
-          quoteChar = char;
-        } else if (inString && char === quoteChar) {
-          inString = false;
-        } else if (!inString) {
-          if (char === '[') bracketDepth++;
-          else if (char === ']') bracketDepth--;
-        }
-      }
-    }
-    if (current.trim()) parts.push(current.trim());
-    return parts;
-  };
-  
-  const parts = splitByCommaOutsideBrackets(rawInput);
-  
-  parts.forEach(part => {
-    const trimmed = part.trim();
-    if (trimmed) {
-      // Sanitize variable names: replace spaces with underscores
-      const sanitized = trimmed.replace(/([a-zA-Z_$][a-zA-Z0-9_$]*)\s+([a-zA-Z_$])/g, '$1_$2');
-      assignments.push(sanitized);
-      const varName = sanitized.split('=')[0].trim();
-      if (varName) funcArgs.push(varName);
-    }
-  });
-  
-  return `
+  const expectedIsArray = Array.isArray(expected);
+  const testCode = expectedIsArray ? `
+try {
+  ${assignments.join(';\n  ')};
+  let result = ${functionName}(${funcArgs.join(', ')});
+  const expected = ${JSON.stringify(expected)};
+  if (result && result.val !== undefined && Array.isArray(expected)) {
+    result = treeToArray(result);
+  }
+  const passed = JSON.stringify(result) === JSON.stringify(expected);
+  console.log(JSON.stringify({test: ${index + 1}, status: passed ? "PASS" : "FAIL"}));
+} catch (e) {
+  console.log(JSON.stringify({test: ${index + 1}, status: "ERROR", error: e.message}));
+}` : `
 try {
   ${assignments.join(';\n  ')};
   const result = ${functionName}(${funcArgs.join(', ')});
   const expected = ${JSON.stringify(expected)};
   const passed = JSON.stringify(result) === JSON.stringify(expected);
-  console.log("Test ${index + 1}: " + (passed ? "PASS" : "FAIL"));
+  console.log(JSON.stringify({test: ${index + 1}, status: passed ? "PASS" : "FAIL"}));
 } catch (e) {
-  console.log("Test ${index + 1}: ERROR " + e.message);
+  console.log(JSON.stringify({test: ${index + 1}, status: "ERROR", error: e.message}));
 }`;
+  return testCode;
 }).join('')}
 console.log("=== EXECUTION COMPLETE ===");
 `;
@@ -215,9 +842,15 @@ console.log("=== EXECUTION COMPLETE ===");
         // Normalize Python indentation
         const pythonNormalizedCode = normalizePythonIndentation(normalizedCode);
         
+        // Check if this is a tree or linked list problem using utility
+        const isTreeOrLinkedListProblemFlag = isTreeOrLinkedListProblem(questionData, normalizedCode);
+        
+        // Get Python helpers using utility function
+        const pythonHelpers = isTreeOrLinkedListProblemFlag ? getPythonHelpers() : '';
+        
         // Very simple Python harness
         const harness = (() => {
-          const testCode = testCases.map((tc, idx) => {
+          const testCode = validTestCases.map((tc, idx) => {
             const inputStr = typeof tc.input === 'string' ? tc.input : '';
             let expected = tc.expected;
             
@@ -233,76 +866,88 @@ console.log("=== EXECUTION COMPLETE ===");
             if (expected === true) expectedPython = 'True';
             else if (expected === false) expectedPython = 'False';
             else if (typeof expected === 'string') {
-              // Check if it's a numeric string - if so, don't quote it
-              if (!isNaN(expected) && expected.trim() !== '') {
-                expectedPython = expected.trim();
-              } else {
-                expectedPython = JSON.stringify(expected);
+              // Try to parse as JSON first (handles arrays like "[0,1]")
+              try {
+                const parsed = JSON.parse(expected);
+                expectedPython = JSON.stringify(parsed);
+              } catch {
+                // If not JSON, check if it's a numeric string
+                if (!isNaN(expected) && expected.trim() !== '') {
+                  expectedPython = expected.trim();
+                } else {
+                  // For plain strings, use repr-like formatting
+                  expectedPython = JSON.stringify(expected);
+                }
               }
+            } else if (typeof expected === 'number') {
+              expectedPython = String(expected);
             } else {
-              expectedPython = expected;
+              // For arrays and objects, stringify them
+              try {
+                expectedPython = JSON.stringify(expected);
+              } catch (parseError) {
+                console.error('Failed to stringify expected value:', parseError);
+                expectedPython = String(expected);
+              }
             }
             
-  // Parse input to extract variable assignments and function arguments
-  // Format: 's="value"' or 'nums=[1,2,3], target=5'
-  const assignments = [];
-  const funcArgs = [];
-  
-  // Function to split by comma only outside quotes and brackets
-  const splitByCommaOutsideBrackets = (str) => {
-    const parts = [];
-    let current = '';
-    let inString = false;
-    let quoteChar = '';
-    let bracketDepth = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str[i];
-      if (!inString && bracketDepth === 0 && char === ',') {
-        parts.push(current.trim());
-        current = '';
-      } else {
-        current += char;
-        if (!inString && (char === '"' || char === "'")) {
-          inString = true;
-          quoteChar = char;
-        } else if (inString && char === quoteChar) {
-          inString = false;
-        } else if (!inString) {
-          if (char === '[') bracketDepth++;
-          else if (char === ']') bracketDepth--;
-        }
-      }
-    }
-    if (current.trim()) parts.push(current.trim());
-    return parts;
-  };
-  
-  const parts = splitByCommaOutsideBrackets(inputStr);
-  
-  parts.forEach(part => {
-    const trimmed = part.trim();
-    if (trimmed) {
-      // Sanitize variable names: replace spaces with underscores for Python
-      const sanitized = trimmed.replace(/([a-zA-Z_][a-zA-Z0-9_]*)\s+([a-zA-Z_])/g, '$1_$2');
-      assignments.push(sanitized);
-      const varName = sanitized.split('=')[0].trim();
-      if (varName) funcArgs.push(varName);
-    }
-  });            return `  try:
-    import ast
+  // Use utility function to process test input
+  const { assignments, funcArgs } = processTestInput(inputStr, isTreeOrLinkedListProblemFlag, 'python');            
+            // Escape the expected value for proper Python string embedding
+            const expectedPythonEscaped = expectedPython.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+            
+            // Convert JavaScript boolean to Python boolean (True/False with capital first letter)
+            const expectedIsArray = Array.isArray(expected);
+            const expectedIsArrayPython = expectedIsArray ? 'True' : 'False';
+            
+            return `  try:
+    import json
     ${assignments.join('\n    ')}
-    result = solution.${functionName}(${funcArgs.join(', ')})
-    expected = ast.literal_eval(${expectedPython})
-    passed = result == expected
-    print("Test ${idx + 1}: " + ("PASS" if passed else "FAIL"))
+    # Try calling as a method of Solution class, fallback to standalone function
+    try:
+      result = solution.${functionName}(${funcArgs.join(', ')})
+    except (AttributeError, NameError):
+      result = ${functionName}(${funcArgs.join(', ')})
+    
+    # Parse expected value (handles arrays, objects, primitives)
+    expected_str = "${expectedPythonEscaped}"
+    try:
+      expected = json.loads(expected_str)
+    except:
+      # Fallback for simple values
+      if expected_str.strip() in ['True', 'true']:
+        expected = True
+      elif expected_str.strip() in ['False', 'false']:
+        expected = False
+      else:
+        try:
+          expected = eval(expected_str.strip())
+        except:
+          expected = expected_str.strip()
+    
+    # If result is a TreeNode and expected is a list, convert tree to array
+    if ${expectedIsArrayPython} and result and hasattr(result, 'val'):
+      result = tree_to_array(result)
+    
+    # Compare results with flexible matching
+    try:
+      passed = result == expected or json.dumps(result, sort_keys=True) == json.dumps(expected, sort_keys=True)
+    except:
+      passed = str(result) == str(expected)
+    
+    print(json.dumps({"test": ${idx + 1}, "status": "PASS" if passed else "FAIL"}))
   except Exception as e:
-    print("Test ${idx + 1}: ERROR " + str(e))`;
+    print(json.dumps({"test": ${idx + 1}, "status": "ERROR", "error": str(e)}))`;
           }).join('\n');
 
-          return `${pythonNormalizedCode}
+          return `${pythonHelpers}${pythonNormalizedCode}
 
 if __name__ == "__main__":
-  solution = Solution()
+  # Check if Solution class exists in user code
+  try:
+    solution = Solution()
+  except NameError:
+    solution = None
   print("=== TEST RESULTS ===")
 ${testCode}
   print("=== EXECUTION COMPLETE ===")`;
@@ -327,7 +972,7 @@ ${testCode}
         const userCodeWithoutImports = codeLines.join('\n');
         
         const harness = (() => {
-          const testCode = testCases.map((tc, idx) => {
+          const testCode = validTestCases.map((tc, idx) => {
             const inputStr = typeof tc.input === 'string' ? tc.input : '';
             let expected = tc.expected;
             
@@ -342,40 +987,11 @@ ${testCode}
             const expectedJava = expected === true ? 'true' : expected === false ? 'false' : expected;
             
   // Parse input to extract variable assignments and function arguments
-  // Format: 'stones = [2,7,4,1,8,1]'
   const assignments = [];
   const funcArgs = [];
   
-  // Function to split by comma only outside quotes and brackets
-  const splitByCommaOutsideBrackets = (str) => {
-    const parts = [];
-    let current = '';
-    let inString = false;
-    let quoteChar = '';
-    let bracketDepth = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str[i];
-      if (!inString && bracketDepth === 0 && char === ',') {
-        parts.push(current.trim());
-        current = '';
-      } else {
-        current += char;
-        if (!inString && (char === '"' || char === "'")) {
-          inString = true;
-          quoteChar = char;
-        } else if (inString && char === quoteChar) {
-          inString = false;
-        } else if (!inString) {
-          if (char === '[') bracketDepth++;
-          else if (char === ']') bracketDepth--;
-        }
-      }
-    }
-    if (current.trim()) parts.push(current.trim());
-    return parts;
-  };
-  
-  const parts = splitByCommaOutsideBrackets(inputStr);
+  // Use utility function to parse input
+  const parts = parseInputString(inputStr);
   
   // Fallback to original assignment-style parsing for all cases
   parts.forEach(part => {
@@ -469,9 +1085,9 @@ ${testCode}
             passed = java.util.Objects.equals(result, expectedValue);`;
             })()}
             
-            System.out.println("Test ${idx + 1}: " + (passed ? "PASS" : "FAIL"));
+            System.out.println("{\\"test\\":${idx + 1},\\"status\\":\\"" + (passed ? "PASS" : "FAIL") + "\\"}");
         } catch (Exception e) {
-            System.out.println("Test ${idx + 1}: ERROR " + e.getMessage());
+            System.out.println("{\\"test\\":${idx + 1},\\"status\\":\\"ERROR\\",\\"error\\":\\"" + e.getMessage() + "\\"}");
         }`;
           }).join('\n');
 
@@ -492,8 +1108,122 @@ ${testCode}
         return harness.replace(/\r\n/g, '\n');
       }
 
+      case 'c':
+      case 'c++': {
+        // C/C++ test harness generation with enhanced data type support
+        const cppHelpers = getCCPPHelpers();
+        
+        const harness = `
+${cppHelpers}
+
+${normalizedCode}
+
+int main() {
+    printf("=== TEST RESULTS ===\\n");
+${validTestCases.map((testCase, index) => {
+  const inputStr = typeof testCase.input === 'string' ? testCase.input : '';
+  let expected = testCase.expected;
+  
+  // Detect input type
+  const isArrayInput = /^\[.*\]$/.test(inputStr.trim());
+  const isStringInput = /^["'].*["']$/.test(inputStr.trim());
+  const isMultipleInputs = inputStr.includes(',') && !isArrayInput;
+  
+  // Generate test code based on input type
+  let testCode = '';
+  
+  if (isArrayInput) {
+    // Array input handling
+    const expectedStr = Array.isArray(expected) ? `[${expected.join(',')}]` : String(expected);
+    testCode = `
+    // Test ${index + 1}: Array input
+    {
+        int size;
+        int* input = parseIntArray("${inputStr}", &size);
+        ${Array.isArray(expected) ? `
+        int expectedSize;
+        int* expectedArr = parseIntArray("${expectedStr}", &expectedSize);
+        int* result = ${functionName}(input, size);
+        bool passed = compareIntArrays(result, size, expectedArr, expectedSize);
+        ` : `
+        int result = ${functionName}(input, size);
+        int expectedValue = ${expected};
+        bool passed = (result == expectedValue);
+        `}
+        printf("{\\"test\\":${index + 1},\\"status\\":\\"%s\\"}\\n", passed ? "PASS" : "FAIL");
+    }`;
+  } else if (isStringInput) {
+    // String input handling
+    const expectedStr = typeof expected === 'string' ? expected.replace(/['"]/g, '') : String(expected);
+    testCode = `
+    // Test ${index + 1}: String input
+    {
+        char* input = parseString("${inputStr}");
+        ${typeof expected === 'string' ? `
+        char* expectedStr = "${expectedStr}";
+        char* result = ${functionName}(input);
+        bool passed = compareStrings(result, expectedStr);
+        ` : `
+        int result = ${functionName}(input);
+        int expectedValue = ${expected};
+        bool passed = (result == expectedValue);
+        `}
+        printf("{\\"test\\":${index + 1},\\"status\\":\\"%s\\"}\\n", passed ? "PASS" : "FAIL");
+    }`;
+  } else if (isMultipleInputs) {
+    // Multiple simple inputs (e.g., "x=5, y=10")
+    const inputs = inputStr.split(',').map(s => s.trim());
+    const assignments = inputs.map(input => {
+      const match = input.match(/(\w+)\s*=\s*(.+)/);
+      if (match) {
+        return `int ${match[1]} = ${match[2]};`;
+      }
+      return '';
+    }).filter(Boolean);
+    
+    testCode = `
+    // Test ${index + 1}: Multiple inputs
+    {
+        ${assignments.join('\n        ')}
+        int result = ${functionName}(${inputs.map(i => i.split('=')[0].trim()).join(', ')});
+        int expectedValue = ${typeof expected === 'string' && !isNaN(expected) ? parseInt(expected) : expected};
+        bool passed = (result == expectedValue);
+        printf("{\\"test\\":${index + 1},\\"status\\":\\"%s\\"}\\n", passed ? "PASS" : "FAIL");
+    }`;
+  } else {
+    // Simple single input
+    const cleanInput = inputStr.replace(/[a-zA-Z_]\w*\s*=\s*/, '');
+    testCode = `
+    // Test ${index + 1}: Simple input
+    {
+        int input = ${cleanInput};
+        ${Array.isArray(expected) ? `
+        int expectedSize;
+        int* expectedArr = parseIntArray("${JSON.stringify(expected)}", &expectedSize);
+        int* result = ${functionName}(input);
+        // Note: Array return requires size parameter
+        printf("{\\"test\\":${index + 1},\\"status\\":\\"ERROR\\",\\"error\\":\\"Array return not fully supported\\"}\\n");
+        ` : `
+        int result = ${functionName}(input);
+        int expectedValue = ${typeof expected === 'string' && !isNaN(expected) ? parseInt(expected) : expected};
+        bool passed = (result == expectedValue);
+        printf("{\\"test\\":${index + 1},\\"status\\":\\"%s\\"}\\n", passed ? "PASS" : "FAIL");
+        `}
+    }`;
+  }
+  
+  return testCode;
+}).join('')}
+    printf("=== EXECUTION COMPLETE ===\\n");
+    return 0;
+}
+`;
+        return harness.replace(/\r\n/g, '\n');
+      }
+
       default:
         // For other languages, preserve original line endings/spacing
+        console.warn(`Language '${lang}' is not fully supported. Supported languages: JavaScript, Python, Java, C, C++. Using basic code normalization.`);
         return normalizeLineEndings(normalizedCode);
     }
   };
@@ -539,23 +1269,51 @@ ${testCode}
     console.log('Raw stdout:', stdout);
     console.log('Raw stderr:', stderr);
 
-    // Split into lines and filter
+    // Split into lines and parse JSON test results
     const lines = combined.split('\n').map(l => l.trim()).filter(Boolean);
     
-    // Look for "Test X: PASS" or "Test X: FAIL" patterns (very simple)
-    const testLines = lines.filter(l => /test\s*\d+\s*:/i.test(l));
+    // Parse JSON test results to avoid false positives
+    const testResults = [];
+    let jsonParseFailures = 0;
     
-    console.log('Found test lines:', testLines);
+    lines.forEach(line => {
+      try {
+        const parsed = JSON.parse(line);
+        if (parsed.test && parsed.status) {
+          testResults.push(parsed);
+        }
+      } catch (e) {
+        // Not a JSON test result, try legacy regex as fallback
+        if (/^Test\s+\d+\s*:\s*(PASS|FAIL|ERROR)/i.test(line)) {
+          jsonParseFailures++;
+          console.debug('JSON parse failed for test result, using regex fallback:', line, e.message);
+          const match = line.match(/^Test\s+(\d+)\s*:\s*(PASS|FAIL|ERROR)(?:\s+(.*))?/i);
+          if (match) {
+            testResults.push({
+              test: parseInt(match[1]),
+              status: match[2].toUpperCase(),
+              error: match[3] || undefined
+            });
+          }
+        }
+      }
+    });
+    
+    if (jsonParseFailures > 0) {
+      console.warn(`Fallback to regex parsing for ${jsonParseFailures} test results`);
+    }
+    
+    console.log('Found test results:', testResults);
 
-    // Count passes by looking for "PASS" keyword
-    const passedTests = testLines.filter(l => /\bPASS\b/i.test(l)).length;
-    const totalTests = Array.isArray(testCases) && testCases.length ? testCases.length : testLines.length || 0;
+    const passedTests = testResults.filter(r => r.status === 'PASS').length;
+    const errorTests = testResults.filter(r => r.status === 'ERROR').length;
+    const totalTests = Array.isArray(testCases) && testCases.length ? testCases.length : testResults.length || 0;
 
-    console.log('Passed:', passedTests, 'Total:', totalTests);
+    console.log('Passed:', passedTests, 'Total:', totalTests, 'Errors:', errorTests);
 
     const allPassed = totalTests > 0 && passedTests === totalTests;
     const anyPassed = passedTests > 0;
-    const hasErrors = testLines.some(line => /\bERROR\b/i.test(line));
+    const hasErrors = errorTests > 0;
 
     // Calculate code complexity and metrics
     const complexity = calculateComplexityScore(userCode);
@@ -564,43 +1322,83 @@ ${testCode}
     // Detect simple inefficiency patterns to be stricter about "0%"
     const hasSort = /\.sort\s*\(|\bsort\s*\(/i.test(userCode);
     const hasNestedLoops = /for\s*\([^)]*\)\s*\{[\s\S]{0,400}?for\s*\(/i.test(userCode) || /for\s*\([^)]*\)\s*\{[\s\S]{0,400}?while\s*\(/i.test(userCode);
-    const hasRecursion = /\b([a-zA-Z_][\w]*)\s*\([^)]*\)\s*\{[\s\S]*\b\1\s*\(/.test(userCode);
-    const hasInefficientPattern = hasSort || hasNestedLoops || hasRecursion;
+    
+    // Check if this is a problem type where recursion is optimal
+    const isTreeProblem = /tree|node|root|left|right|parent|child/i.test(userCode) || (currentQuestionData && /tree|node|subtree/i.test(currentQuestionData.problem || ''));
+    const isGraphProblem = /graph|vertex|edge|adjacency|dfs|bfs/i.test(userCode) || (currentQuestionData && /graph|vertex|edge/i.test(currentQuestionData.problem || ''));
+    const isLinkedListProblem = /head|next|ListNode|linkedlist|linked list/i.test(userCode) || (currentQuestionData && /linked list|listnode/i.test(currentQuestionData.problem || ''));
+    const isBacktrackingProblem = /backtrack|permutation|combination|subset/i.test(userCode) || (currentQuestionData && /permutation|combination|subset|backtrack/i.test(currentQuestionData.problem || ''));
+    const isDivideConquerProblem = /merge.*sort|quick.*sort|divide.*conquer/i.test(userCode) || (currentQuestionData && /merge sort|quick sort|divide and conquer/i.test(currentQuestionData.problem || ''));
+    const hasMemoization = /memo|cache|dp|dynamic/i.test(userCode);
+    
+    // Only flag recursion as inefficient if it's NOT for problems where recursion is optimal
+    // Improved: detect both direct recursion (funcA calls funcA) and helper function recursion (funcA contains funcB that calls funcB)
+    const hasRecursion = /\b([a-zA-Z_][\w]*)\s*\([^)]*\)\s*\{[\s\S]*\b\1\s*\(/.test(userCode) || 
+                         /const\s+([a-zA-Z_][\w]*)\s*=\s*\([^)]*\)\s*=>\s*\{[\s\S]{0,500}?\b\1\s*\(/.test(userCode) ||
+                         /function\s+([a-zA-Z_][\w]*)\s*\([^)]*\)\s*\{[\s\S]{0,500}?\b\1\s*\(/.test(userCode);
+    const hasInefficientRecursion = hasRecursion && !isTreeProblem && !isGraphProblem && !isLinkedListProblem && !isBacktrackingProblem && !isDivideConquerProblem && !hasMemoization;
+    
+    const hasInefficientPattern = hasSort || hasNestedLoops || hasInefficientRecursion;
 
     // Detect known optimal algorithms
     const isBoyerMoore = /count\s*=\s*0/i.test(userCode) && /candidate/i.test(userCode) && /count\s*\+\+|count\s*--/i.test(userCode);
     const isBinarySearch = /while\s*\(\s*l\s*<=\s*r\s*\)/i.test(userCode) && /Math\.floor\s*\(\s*\(\s*l\s*\+\s*r\s*\)\s*\/\s*2\s*\)/i.test(userCode);
-    const isOptimalAlgorithm = isBoyerMoore || isBinarySearch;
+    
+    // Detect optimal tree traversal patterns (recursive DFS is optimal for trees)
+    const isOptimalTreeTraversal = isTreeProblem && hasRecursion && 
+      (/\.left|\['left'\]|\["left"\]/i.test(userCode) || /\.right|\['right'\]|\["right"\]/i.test(userCode));
+    
+    // Detect optimal subtree checking (recursive comparison is standard)
+    const isOptimalSubtree = /subtree/i.test(currentQuestionData?.problem || '') && 
+      /isSameTree|isSame|isIdentical|isEqual/i.test(userCode) && hasRecursion;
+    
+    // Detect optimal linked list recursion (recursive is natural and optimal for many LL problems)
+    const isOptimalLinkedListRecursion = isLinkedListProblem && hasRecursion && 
+      (/\.next|\['next'\]|\["next"\]/i.test(userCode) || /head|node/i.test(userCode));
+    
+    // Detect optimal backtracking (recursion is the standard approach)
+    const isOptimalBacktracking = isBacktrackingProblem && hasRecursion;
+    
+    // Detect optimal divide & conquer (merge sort, quick sort, etc.)
+    const isOptimalDivideConquer = isDivideConquerProblem && hasRecursion;
+    
+    // Detect DP with memoization (recursion + caching is optimal)
+    const isOptimalDPWithMemo = hasRecursion && hasMemoization;
+    
+    const isOptimalAlgorithm = isBoyerMoore || isBinarySearch || isOptimalTreeTraversal || isOptimalSubtree || 
+                               isOptimalLinkedListRecursion || isOptimalBacktracking || isOptimalDivideConquer || isOptimalDPWithMemo;
 
     // Compute a refactoring percentage based on test results and code complexity
     let refactoringPercentage;
     if (totalTests > 0) {
       if (allPassed) {
-        // Base percent from complexity (higher complexity = more refactor needed)
-        let base = Math.round(complexityScore * 0.8);
-
-        // If we detect clear inefficient patterns, bump the base to ensure refactor is recommended
-        if (hasInefficientPattern) base = Math.max(base, 50);
-
-        // Only allow 0% when code is extremely simple and contains no inefficient patterns, or is a known optimal algorithm
-        const allowZero = (base <= 5 && !hasInefficientPattern) || isOptimalAlgorithm;
-
-        if (allowZero) {
+        // Allow 0% for optimal algorithms
+        if (isOptimalAlgorithm) {
           refactoringPercentage = 0;
         } else {
-          // Enforce a minimum sensible recommendation so 0% isn't shown for slightly imperfect code
-          refactoringPercentage = Math.min(100, Math.max(base, 10));
+          // Base percent from complexity (higher complexity = more refactor needed)
+          let base = Math.round(complexityScore * 0.5);
+          
+          // Increase for clearly inefficient patterns
+          if (hasInefficientPattern) {
+            base = Math.round(complexityScore * 0.7);
+          }
+          
+          // No forced minimums - let natural complexity score determine percentage
+          refactoringPercentage = Math.min(100, base);
         }
       } else {
-        // If some tests fail, use failure rate but cap it
+        // If some tests fail, use failure rate
         const failureBased = Math.round((1 - (passedTests / totalTests)) * 100);
         refactoringPercentage = Math.min(100, failureBased);
       }
     } else {
-      // No tests found; use complexity with stricter minimum
-      let base = Math.round(complexityScore * 0.8);
-      if (hasInefficientPattern) base = Math.max(base, 50);
-      refactoringPercentage = Math.min(100, Math.max(base, 15));
+      // No tests found; use complexity analysis without forced minimums
+      let base = Math.round(complexityScore * 0.5);
+      if (hasInefficientPattern) {
+        base = Math.round(complexityScore * 0.7);
+      }
+      refactoringPercentage = Math.min(100, base);
     }
 
     const refactoringPotential = `${refactoringPercentage}%`;
@@ -628,163 +1426,34 @@ ${testCode}
       showRefactoring: true,
   refactoringPotential,
   refactoringPercentage,
-      detailedResults: testLines
+      detailedResults: testResults
     };
   };
 
-  // Analyze code for optimization using DIRECT Mistral AI
+  // Note: detectOptimalAlgorithms and getPatternSuggestions are now defined outside the component for reusability
+
+  // Analyze code for optimization using DIRECT Mistral AI (Refactored with utilities)
   const analyzeWithMistral = async (userCode, language, problem) => {
-    const optimizationPrompt = `Analyze this code and give ONLY a percentage (0-100%) for how much optimization is needed based on:
-1. Time complexity (O notation) - can it be better?
-2. Space complexity (O notation) - can it use less memory?
-3. Code efficiency and best practices
-4. Alternative approaches that are more optimal
-5. Memory usage and unnecessary operations
-6. Code readability and maintainability
-
-CRITICAL: For these specific optimal algorithms, ALWAYS give 0-10%:
-- Boyer-Moore Majority Vote: if code uses count=0, candidate variable, and increments/decrements count based on equality with candidate (like: let count = 0; let candidate; for(...) { if(count===0) candidate=num; if(num===candidate) count++; else count--; })
-- Binary Search: if code uses while(low<=high) and mid=(low+high)/2
-- Hash Map solutions for O(n) problems like Two Sum
-- Iterative approaches instead of recursive for O(2^n) problems
-
-IMPORTANT: For common algorithmic problems, recognize optimal solutions:
-- Majority Element: Boyer-Moore voting algorithm is optimal (O(n) time, O(1) space). Hash map solutions are suboptimal and should be flagged as 70-90% needing optimization due to O(n) space usage.
-- Binary Search: O(log n) time is optimal for sorted arrays
-- Two Sum: O(n) time with hash map is optimal
-- Fibonacci: Iterative O(n) is better than recursive O(2^n)
-- Sorting: Built-in sort is acceptable unless custom implementation needed
-- Graph traversal: DFS/BFS are optimal depending on problem
-
-PROBLEM: ${problem || 'General coding problem'}
-LANGUAGE: ${language}
-CODE: 
-\\\`${language}
-${userCode}
-\\\`
-
-Be strict but fair - if the algorithm is already optimal for the problem constraints, give low percentage (0-20%).
-Respond with ONLY a number between 0-100. Nothing else.
-`;
-
     try {
       console.log('🤖 Calling Mistral AI via Ollama...');
       
-      const response = await fetch('http://localhost:11434/api/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'mistral',
-          prompt: optimizationPrompt,
-          stream: false,
-          options: {
-            temperature: 0.1,
-            top_p: 0.9,
-          }
-        })
-      });
+      // Use utility to create prompt
+      const optimizationPrompt = createOptimizationPrompt(userCode, language, problem);
+      
+      // Call Ollama API using utility
+      let optimizationPercentage = await callOllamaAPI(optimizationPrompt);
+      
+      // Apply pattern-based adjustments using utility
+      optimizationPercentage = applyPatternAdjustments(
+        optimizationPercentage, 
+        userCode, 
+        problem, 
+        detectOptimalAlgorithms, 
+        getPatternSuggestions
+      );
 
-      if (!response.ok) {
-        throw new Error(`Ollama error: ${response.status}`);
-      }
-
-      const result = await response.json();
-      const aiResponse = result.response.trim();
-      
-      console.log('Mistral raw response:', aiResponse);
-
-      // Extract percentage from response
-      const percentageMatch = aiResponse.match(/(\d+)%/);
-      let optimizationPercentage = 50; // Default fallback
-      
-      if (percentageMatch) {
-        optimizationPercentage = parseInt(percentageMatch[1]);
-      } else {
-        // Try to extract any number from response
-        const numberMatch = aiResponse.match(/\b(\d{1,3})\b/);
-        if (numberMatch) {
-          optimizationPercentage = parseInt(numberMatch[1]);
-        }
-      }
-
-      // Ensure percentage is within bounds
-      optimizationPercentage = Math.max(0, Math.min(100, optimizationPercentage));
-
-      // Override AI if we detect optimal algorithms locally
-      // Language-agnostic optimal algorithm detection
-      const isBoyerMoore = ((/(?:\$?count|\b(?:int|Integer|var|let|const|let\s+mut)\s+count)\s*(?:=|:=)\s*0/i.test(userCode)) || /count\s*(?:=|:=)\s*0/i.test(userCode))
-              && /\$?candidate|candidate/i.test(userCode) &&
-              (/(?:\$?count\s*\+\+|\$?count\s*--|\$?count\s*[+-]=\s*1|\$?count\s*\+\s*=\s*[^;]*==\s*\$?candidate|\$?count\s*\+\s*=\s*1\s+if\s+[^;]*==\s*\$?candidate\s+else\s+-1)/i.test(userCode));
-      const isBinarySearch = /while\s*\(?\s*\w+\s*<=\s*\w+\s*\)?/i.test(userCode) && 
-                            (/Math\.floor\s*\(\s*\(\s*\w+\s*\+\s*\w+\s*\)\s*\/\s*2\s*\)|\w+\s*=\s*parseInt\s*\(\s*\(\s*\w+\s*\+\s*\w+\s*\)\s*\/\s*2\s*\)|\w+\s*=\s*Math\.floor\s*\(\s*\(\s*\w+\s*\+\s*\w+\s*\)\s*\/\s*2\s*\)|\w+\s*=\s*\w+\s*\+\s*\(\s*\w+\s*-\s*\w+\s*\)\s*\/\s*2|\w+\s*=\s*\(\s*\w+\s*\+\s*\w+\s*\)\s*\/\/\s*2|\w+\s*=\s*\(\s*\w+\s*\+\s*\w+\s*\)\s*\/\s*2/i.test(userCode));
-      
-      // Optimal sorting detection (built-in sort is acceptable)
-      const isBuiltInSort = (/(?:\w+\.sort\b|\w+\.sort\s*\(|\bArrays\.sort\b|\bsorted\s*\(|\bsort\s*\(|sort\.Ints\s*\()/i.test(userCode)) && !/bubble|insertion|selection|merge|quick/i.test(userCode);
-      
-      // Optimal hash map usage for O(n) problems
-      const isOptimalHashMap = problem && (
-        problem.toLowerCase().includes('two sum') ||
-        problem.toLowerCase().includes('two numbers') ||
-        problem.toLowerCase().includes('contains duplicate') ||
-        problem.toLowerCase().includes('subarray sum')
-      ) && /new\s+Map\(|unordered_map|HashMap|Map\s*<|Dictionary\b|map\s*\[|array\s*\(|\$?\w+\s*:=\s*map|\$?cnt\s*\[|\bcount\s*\[|\$?count\s*=\s*\{\}|count\.get|count\[|\.getOrDefault|\.put|\.count/i.test(userCode);
-      
-      // Optimal flood fill DFS detection
-      const isFloodFillDFS = problem && problem.toLowerCase().includes('flood') &&
-        (/def\s+floodFill|function\s+floodFill|public\s+int\[\]\[\]\s+floodFill|def\s+\w+\s*\([^)]*\)\s*:\s*[\s\S]*image[\s\S]*sr[\s\S]*sc[\s\S]*newColor/i.test(userCode) ||
-         /class\s+Solution[\s\S]*def\s+floodFill/i.test(userCode)) &&
-        /def\s+dfs|function\s+dfs|private\s+void\s+dfs/i.test(userCode) &&
-        /r\s*[<>]=?\s*R|r\s*[<>]=?\s*len\(image\)|r\s*[<>]=?\s*image\.length/i.test(userCode) &&
-        /c\s*[<>]=?\s*C|c\s*[<>]=?\s*len\(image\[0\]\)|c\s*[<>]=?\s*image\[0\]\.length/i.test(userCode) &&
-        /image\[r\]\[c\]\s*!=?\s*originalColor|image\[r\]\[c\]\s*!=?\s*\w+/i.test(userCode) &&
-        /dfs\(r\s*[+-]\s*1,\s*c\)|dfs\(r,\s*c\s*[+-]\s*1\)/i.test(userCode);
-      
-      // Optimal algorithms that should always be 0%
-      const isOptimalAlgorithm = isBoyerMoore || isBinarySearch || isBuiltInSort || isOptimalHashMap || isFloodFillDFS;
-      let suboptimalOverride = null;
-      
-      // Majority element with hash map (suboptimal)
-      if (problem && problem.toLowerCase().includes('majority') &&
-          ( /new\s+Map\(|unordered_map|HashMap|Map\s*<|Dictionary\b|map\s*\[|array\s*\(|\$?\w+\s*:=\s*map|\$?cnt\s*\[|\bcount\s*\[|\$?count\s*=\s*\{\}|count\.get|count\[|\.getOrDefault|\.put|\.count/i.test(userCode) ||
-           /Map\.set|Map\.get|\.hasOwnProperty|Object\.keys|for.*in.*(count|cnt|\w+)/i.test(userCode) )) {
-        suboptimalOverride = Math.max(optimizationPercentage, 75); // Force minimum 75% for hash map majority element
-      }
-      
-      // Quadratic sorting algorithms (bubble, insertion, selection sort)
-      if (/bubble|insertion|selection/i.test(userCode) && /sort/i.test(userCode)) {
-        suboptimalOverride = Math.max(optimizationPercentage, 80); // Force minimum 80% for O(n²) sorts
-      }
-      
-      // Recursive Fibonacci without memoization
-      const isRecursiveFibo = ((/fibonacci?\s*\(\s*\$?n\s*-\s*1\s*\)\s*\+\s*fibonacci?\s*\(\s*\$?n\s*-\s*2\s*\)/i.test(userCode) || /return\s+fibonacci?\s*\(\s*\$?n\s*-\s*1\s*\)\s*\+\s*fibonacci?\s*\(\s*\$?n\s*-\s*2\s*\)/i.test(userCode))) && !/memo|cache|dp|dynamic/i.test(userCode);
-      if (problem && problem.toLowerCase().includes('fibonacci') && isRecursiveFibo) {
-        suboptimalOverride = Math.max(optimizationPercentage, 85); // Force minimum 85% for naive recursive Fibonacci
-      }      // Apply overrides
-      if (isOptimalAlgorithm) {
-        optimizationPercentage = 0; // Force to 0% for known optimal algorithms
-      } else if (suboptimalOverride !== null) {
-        optimizationPercentage = suboptimalOverride; // Apply minimum refactoring percentage for suboptimal patterns
-      }
-
-      // Generate feedback based on optimization percentage
-      let feedback = '';
-      let suggestions = '';
-      
-      if (optimizationPercentage <= 20) {
-        feedback = '🟢 Excellent! Your code is highly optimized.';
-        suggestions = 'Minimal changes needed. Focus on maintaining this quality.';
-      } else if (optimizationPercentage <= 50) {
-        feedback = '🟡 Good code with some optimization opportunities.';
-        suggestions = 'Consider minor refactoring for better performance and readability.';
-      } else if (optimizationPercentage <= 80) {
-        feedback = '🟠 Code needs significant optimization.';
-        suggestions = 'Refactor for better algorithms, reduce complexity, and improve efficiency.';
-      } else {
-        feedback = '🔴 Major optimization required!';
-        suggestions = 'Complete rewrite recommended. Focus on algorithm efficiency and code structure.';
-      }
+      // Generate feedback using utility
+      const { feedback, suggestions } = generateOptimizationFeedback(optimizationPercentage);
 
       return {
         optimizationPercentage,
@@ -799,6 +1468,7 @@ Respond with ONLY a number between 0-100. Nothing else.
       // Fallback to complexity-based calculation
       const fallback = calculateComplexityScore(userCode);
       const fallbackPercentage = fallback.score;
+      
       return {
         optimizationPercentage: fallbackPercentage,
         refactoringPotential: `${fallbackPercentage}%`,
@@ -809,141 +1479,30 @@ Respond with ONLY a number between 0-100. Nothing else.
     }
   };
 
-  // Get AI optimization percentage only
+  // Get AI optimization percentage only (Refactored with utilities)
   const getAIOptimizationPercentage = async (userCode, language, problem) => {
     setAiPercentageLoading(true);
-    const percentagePrompt = `Analyze this code and give ONLY a percentage (0-100%) for how much optimization is needed based on:
-1. Time complexity (O notation) - can it be better?
-2. Space complexity (O notation) - can it use less memory?
-3. Code efficiency and best practices
-4. Alternative approaches that are more optimal
-5. Memory usage and unnecessary operations
-6. Code readability and maintainability
-
-CRITICAL: For these specific optimal algorithms, ALWAYS give 0-10%:
-- Boyer-Moore Majority Vote: if code uses count=0, candidate variable, and increments/decrements count based on equality with candidate (like: let count = 0; let candidate; for(...) { if(count===0) candidate=num; if(num===candidate) count++; else count--; })
-- Binary Search: if code uses while(low<=high) and mid=(low+high)/2
-- Hash Map solutions for O(n) problems like Two Sum
-- Iterative approaches instead of recursive for O(2^n) problems
-
-IMPORTANT: For common algorithmic problems, recognize optimal solutions:
-- Majority Element: Boyer-Moore voting algorithm is optimal (O(n) time, O(1) space). Hash map solutions are suboptimal and should be flagged as 60-80% needing optimization due to O(n) space usage.
-- Binary Search: O(log n) time is optimal for sorted arrays
-- Two Sum: O(n) time with hash map is optimal
-- Fibonacci: Iterative O(n) is better than recursive O(2^n)
-- Sorting: Built-in sort is acceptable unless custom implementation needed
-- Graph traversal: DFS/BFS are optimal depending on problem
-
-PROBLEM: ${problem || 'General coding problem'}
-LANGUAGE: ${language}
-CODE: 
-\\\`${language}
-${userCode}
-\\\`
-
-Be strict but fair - if the algorithm is already optimal for the problem constraints, give low percentage (0-20%).
-Respond with ONLY a number between 0-100. Nothing else.`;
-
+    
     try {
-      const response = await fetch('http://localhost:11434/api/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'mistral',
-          prompt: percentagePrompt,
-          stream: false,
-          options: {
-            temperature: 0.1,
-            top_p: 0.9,
-          }
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Ollama error: ${response.status}`);
-      }
-
-      const result = await response.json();
-      const aiResponse = result.response.trim();
+      // Use utility to create prompt
+      const percentagePrompt = createOptimizationPrompt(userCode, language, problem);
       
-      const percentageMatch = aiResponse.match(/(\d+)%/);
-      let percentage = 50;
+      // Call Ollama API using utility
+      let percentage = await callOllamaAPI(percentagePrompt);
       
-      if (percentageMatch) {
-        percentage = parseInt(percentageMatch[1]);
-      } else {
-        const numberMatch = aiResponse.match(/\b(\d{1,3})\b/);
-        if (numberMatch) percentage = parseInt(numberMatch[1]);
-      }
-
-      percentage = Math.max(0, Math.min(100, percentage));
-
-      // Override AI if we detect optimal algorithms locally
-      // Language-agnostic optimal algorithm detection
-      const isBoyerMoore = ((/(?:\$?count|\b(?:int|Integer|var|let|const|let\s+mut)\s+count)\s*(?:=|:=)\s*0/i.test(userCode)) || /count\s*(?:=|:=)\s*0/i.test(userCode))
-              && /\$?candidate|candidate/i.test(userCode) &&
-              (/(?:\$?count\s*\+\+|\$?count\s*--|\$?count\s*[+-]=\s*1|\$?count\s*\+\s*=\s*[^;]*==\s*\$?candidate|\$?count\s*\+\s*=\s*1\s+if\s+[^;]*==\s*\$?candidate\s+else\s+-1)/i.test(userCode));
-      const isBinarySearch = /while\s*\(?\s*\w+\s*<=\s*\w+\s*\)?/i.test(userCode) && 
-                            (/Math\.floor\s*\(\s*\(\s*\w+\s*\+\s*\w+\s*\)\s*\/\s*2\s*\)|\w+\s*=\s*parseInt\s*\(\s*\(\s*\w+\s*\+\s*\w+\s*\)\s*\/\s*2\s*\)|\w+\s*=\s*Math\.floor\s*\(\s*\(\s*\w+\s*\+\s*\w+\s*\)\s*\/\s*2\s*\)|\w+\s*=\s*\w+\s*\+\s*\(\s*\w+\s*-\s*\w+\s*\)\s*\/\s*2|\w+\s*=\s*\(\s*\w+\s*\+\s*\w+\s*\)\s*\/\/\s*2|\w+\s*=\s*\(\s*\w+\s*\+\s*\w+\s*\)\s*\/\s*2/i.test(userCode));
-      
-      // Optimal sorting detection (built-in sort is acceptable)
-      const isBuiltInSort = (/(?:\w+\.sort\b|\w+\.sort\s*\(|\bArrays\.sort\b|\bsorted\s*\(|\bsort\s*\(|sort\.Ints\s*\()/i.test(userCode)) && !/bubble|insertion|selection|merge|quick/i.test(userCode);
-      
-      // Optimal hash map usage for O(n) problems
-      const isOptimalHashMap = problem && (
-        problem.toLowerCase().includes('two sum') ||
-        problem.toLowerCase().includes('two numbers') ||
-        problem.toLowerCase().includes('contains duplicate') ||
-        problem.toLowerCase().includes('subarray sum')
-      ) && /new\s+Map\(|unordered_map|HashMap|Map\s*<|Dictionary\b|map\s*\[|array\s*\(|\$?\w+\s*:=\s*map|\$?cnt\s*\[|\bcount\s*\[|\$?count\s*=\s*\{\}|count\.get|count\[|\.getOrDefault|\.put|\.count/i.test(userCode);
-      
-      // Optimal flood fill DFS detection
-      const isFloodFillDFS = problem && problem.toLowerCase().includes('flood') &&
-        (/def\s+floodFill|function\s+floodFill|public\s+int\[\]\[\]\s+floodFill|def\s+\w+\s*\([^)]*\)\s*:\s*[\s\S]*image[\s\S]*sr[\s\S]*sc[\s\S]*newColor/i.test(userCode) ||
-         /class\s+Solution[\s\S]*def\s+floodFill/i.test(userCode)) &&
-        /def\s+dfs|function\s+dfs|private\s+void\s+dfs/i.test(userCode) &&
-        /r\s*[<>]=?\s*R|r\s*[<>]=?\s*len\(image\)|r\s*[<>]=?\s*image\.length/i.test(userCode) &&
-        /c\s*[<>]=?\s*C|c\s*[<>]=?\s*len\(image\[0\]\)|c\s*[<>]=?\s*image\[0\]\.length/i.test(userCode) &&
-        /image\[r\]\[c\]\s*!=?\s*originalColor|image\[r\]\[c\]\s*!=?\s*\w+/i.test(userCode) &&
-        /dfs\(r\s*[+-]\s*1,\s*c\)|dfs\(r,\s*c\s*[+-]\s*1\)/i.test(userCode);
-      
-      // Optimal algorithms that should always be 0%
-      const isOptimalAlgorithm = isBoyerMoore || isBinarySearch || isBuiltInSort || isOptimalHashMap || isFloodFillDFS;
-      
-      // Suboptimal pattern detection for specific problems
-      let suboptimalOverride = null;
-      
-      // Majority element with hash map (suboptimal)
-      if (problem && problem.toLowerCase().includes('majority') &&
-          ( /new\s+Map\(|unordered_map|HashMap|Map\s*<|Dictionary\b|map\s*\[|array\s*\(|\$?\w+\s*:=\s*map|\$?cnt\s*\[|\bcount\s*\[|\$?count\s*=\s*\{\}|count\.get|count\[|\.getOrDefault|\.put|\.count/i.test(userCode) ||
-           /Map\.set|Map\.get|\.hasOwnProperty|Object\.keys|for.*in.*(count|cnt|\w+)/i.test(userCode) )) {
-        suboptimalOverride = Math.max(percentage, 75); // Force minimum 75% for hash map majority element
-      }
-      
-      // Quadratic sorting algorithms (bubble, insertion, selection sort)
-      if (/bubble|insertion|selection/i.test(userCode) && /sort/i.test(userCode)) {
-        suboptimalOverride = Math.max(percentage, 80); // Force minimum 80% for O(n²) sorts
-      }
-      
-      // Recursive Fibonacci without memoization
-      const isRecursiveFibo = ((/fibonacci?\s*\(\s*\$?n\s*-\s*1\s*\)\s*\+\s*fibonacci?\s*\(\s*\$?n\s*-\s*2\s*\)/i.test(userCode) || /return\s+fibonacci?\s*\(\s*\$?n\s*-\s*1\s*\)\s*\+\s*fibonacci?\s*\(\s*\$?n\s*-\s*2\s*\)/i.test(userCode))) && !/memo|cache|dp|dynamic/i.test(userCode);
-      if (problem && problem.toLowerCase().includes('fibonacci') && isRecursiveFibo) {
-        suboptimalOverride = Math.max(percentage, 85); // Force minimum 85% for naive recursive Fibonacci
-      }
-      
-      // Apply overrides
-      if (isOptimalAlgorithm) {
-        percentage = 0; // Force to 0% for known optimal algorithms
-      } else if (suboptimalOverride !== null) {
-        percentage = suboptimalOverride; // Apply minimum refactoring percentage for suboptimal patterns
-      }
+      // Apply pattern-based adjustments using utility
+      percentage = applyPatternAdjustments(
+        percentage, 
+        userCode, 
+        problem, 
+        detectOptimalAlgorithms, 
+        getPatternSuggestions
+      );
 
       setAiOptimizationPercentage(percentage);
     } catch (error) {
       console.error('AI percentage fetch failed:', error);
-      setAiOptimizationPercentage(50); // fallback
+      setAiOptimizationPercentage(CONFIG.AI_SETTINGS.DEFAULT_FALLBACK_PERCENTAGE);
     } finally {
       setAiPercentageLoading(false);
     }
@@ -1034,7 +1593,12 @@ function optimizedSolution(input) {
   // Submit code for evaluation using Piston API
   const submitCode = async () => {
     if (!userCode.trim()) {
-      alert('Please write some code before submitting.');
+      console.error('Validation failed: No code provided');
+      setSubmissionResult({ 
+        testResults: '⚠️ Please write some code before submitting.',
+        passed: false,
+        feedback: 'Code validation failed'
+      });
       return;
     }
 
@@ -1067,7 +1631,7 @@ function optimizedSolution(input) {
       
       console.log('Request body length:', JSON.stringify(requestBody).length);
       
-      const response = await fetch('https://emkc.org/api/v2/piston/execute', {
+      const response = await fetch(CONFIG.PISTON_API_ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1120,15 +1684,27 @@ function optimizedSolution(input) {
   // Analyze code for optimization using DIRECT Mistral AI
   const analyzeOptimization = async () => {
     if (!submissionResult) {
-      alert('Please submit your solution first before running optimization.');
+      console.error('Validation failed: Solution not submitted');
+      setOptimizationResult({
+        feedback: '⚠️ Please submit your solution first before running optimization.',
+        optimizationPercentage: null
+      });
       return;
     }
     if (!userCode.trim()) {
-      alert('Please write some code before analyzing optimization.');
+      console.error('Validation failed: No code provided');
+      setOptimizationResult({
+        feedback: '⚠️ Please write some code before analyzing optimization.',
+        optimizationPercentage: null
+      });
       return;
     }
     if (!currentQuestionData) {
-      alert('No question selected to analyze.');
+      console.error('Validation failed: No question selected');
+      setOptimizationResult({
+        feedback: '⚠️ No question selected to analyze.',
+        optimizationPercentage: null
+      });
       return;
     }
 
@@ -1204,8 +1780,7 @@ function optimizedSolution(input) {
   };
 
   const languages = [
-    'javascript', 'python', 'java', 'c++', 'c#', 'typescript', 'php', 'ruby',
-    'go', 'rust', 'swift', 'kotlin'
+    'javascript', 'python', 'java', 'c', 'c++'
   ];
 
   // If no questions are available, show an informative message
@@ -1563,17 +2138,18 @@ function optimizedSolution(input) {
                     padding: '16px', 
                     borderRadius: '8px', 
                     marginBottom: '12px',
-                    border: `2px solid ${displayedRefactoringPercentage <= 20 ? '#4CAF50' : displayedRefactoringPercentage <= 50 ? '#FF9800' : displayedRefactoringPercentage <= 80 ? '#FF5722' : '#f44336'}`,
+                    border: `2px solid ${displayedRefactoringPercentage === 0 ? '#00C853' : displayedRefactoringPercentage <= 20 ? '#4CAF50' : displayedRefactoringPercentage <= 50 ? '#FF9800' : displayedRefactoringPercentage <= 80 ? '#FF5722' : '#f44336'}`,
                     textAlign: 'center'
                   }}>
                     <div style={{ fontSize: '0.9rem', color: 'var(--muted)', marginBottom: '6px' }}>
                       Optimization Required
                     </div>
-                    <div style={{ fontSize: '2rem', fontWeight: '700', color: displayedRefactoringPercentage <= 20 ? '#4CAF50' : displayedRefactoringPercentage <= 50 ? '#FF9800' : displayedRefactoringPercentage <= 80 ? '#FF5722' : '#f44336' }}>
+                    <div style={{ fontSize: '2rem', fontWeight: '700', color: displayedRefactoringPercentage === 0 ? '#00C853' : displayedRefactoringPercentage <= 20 ? '#4CAF50' : displayedRefactoringPercentage <= 50 ? '#FF9800' : displayedRefactoringPercentage <= 80 ? '#FF5722' : '#f44336' }}>
                       {displayedRefactoringPotential}
                     </div>
                     <div style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
-                      {displayedRefactoringPercentage <= 20 ? '🟢 Highly Optimized' : 
+                      {displayedRefactoringPercentage === 0 ? '🌟 Optimal Algorithm!' : 
+                       displayedRefactoringPercentage <= 20 ? '🟢 Highly Optimized' : 
                        displayedRefactoringPercentage <= 50 ? '🟡 Minor Optimization' : 
                        displayedRefactoringPercentage <= 80 ? '🟠 Significant Optimization' : 
                        '🔴 Major Optimization Needed'}

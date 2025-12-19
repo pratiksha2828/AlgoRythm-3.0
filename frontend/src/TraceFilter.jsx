@@ -168,7 +168,13 @@ export default function TraceFilter() {
       {/* Footer */}
       <footer className="footer">
         <div className="footer-content">
-          {/* Footer intentionally minimal; trace guidance shown via info icon */}
+          <div className="footer-section">
+            {/* Footer intentionally minimal; trace guidance shown via info icon */}
+            <div className="footer-actions" style={{ marginTop: 8 }}>
+              <Link to="/faq" className="footer-button"><span className="icon">❓</span>FAQ</Link>
+              <Link to="/feedback" className="footer-button"><span className="icon">💬</span>Share Feedback</Link>
+            </div>
+          </div>
         </div>
 
         <div className="footer-bottom">

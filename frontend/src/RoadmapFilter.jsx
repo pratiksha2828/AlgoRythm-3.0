@@ -77,7 +77,7 @@ const options = {
     { id: 'devops', label: 'DevOps & Cloud', emoji: '⚙️' },
     { id: 'cybersecurity', label: 'Cyber Security', emoji: '🔒' },
     { id: 'blockchain', label: 'Blockchain', emoji: '⛓️' },
-    { id: 'game', label: 'Game Development', emoji: '🎮' }
+    //{ id: 'game', label: 'Game Development', emoji: '🎮' }
   ],
   role: [
     { id: 'frontend', label: 'Frontend Developer', emoji: '🎨' },
@@ -89,7 +89,7 @@ const options = {
     { id: 'mobile-developer', label: 'Mobile Developer', emoji: '📲' },
     { id: 'security-engineer', label: 'Security Engineer', emoji: '🛡️' },
     { id: 'blockchain-dev', label: 'Blockchain Developer', emoji: '🔗' },
-    { id: 'game-developer', label: 'Game Developer', emoji: '🕹️' }
+    //{ id: 'game-developer', label: 'Game Developer', emoji: '🕹️' }
   ],
   language: [
     { id: 'javascript', label: 'JavaScript', emoji: '💛' },
@@ -347,6 +347,10 @@ const options = {
                 Browse all learning paths →
               </Link>
             </p>
+            <div className="footer-actions" style={{ marginTop: 18 }}>
+              <Link to="/faq" className="footer-button"><span className="icon">❓</span>FAQ</Link>
+              <Link to="/feedback" className="footer-button"><span className="icon">💬</span>Share Feedback</Link>
+            </div>
           </div>
         </div>
       </footer>
