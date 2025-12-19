@@ -3,6 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import { parseInputString } from './utils/parseInputString.js';
+import { generateJavaScriptHarness } from './utils/generateJavaScriptHarness.js';
+import { generatePythonHarness } from './utils/generatePythonHarness.js';
 
 // Configuration Constants - Centralized for easy maintenance
 const CONFIG = {
@@ -252,194 +254,6 @@ const validateTestCases = (testCases) => {
 /**
  * Checks if problem involves trees or linked lists
  */
-const isTreeOrLinkedListProblem = (questionData, code) => {
-  return /tree|node|root|left|right|head|next|listnode/i.test(questionData?.problem || '') ||
-         /tree|node|root|left|right|head|next|listnode/i.test(code || '');
-};
-
-/**
- * Helper to process test case input and generate assignments
- */
-const processTestInput = (rawInput, isTreeOrLinkedList, language = 'javascript') => {
-  const assignments = [];
-  const funcArgs = [];
-  const parts = parseInputString(rawInput);
-  
-  parts.forEach(part => {
-    const trimmed = part.trim();
-    if (!trimmed) return;
-    
-    const varMatch = trimmed.match(/^(\w+)\s*=\s*(.+)$/);
-    if (varMatch && isTreeOrLinkedList) {
-      const varName = varMatch[1];
-      const value = varMatch[2];
-      
-      if (/root|tree/i.test(varName)) {
-        const buildFunc = language === 'python' ? 'build_tree' : 'buildTree';
-        assignments.push(`${varName} = ${buildFunc}(${value})`);
-        funcArgs.push(varName);
-        return;
-      } else if (/head|list|l1|l2/i.test(varName)) {
-        const buildFunc = language === 'python' ? 'build_list' : 'buildList';
-        assignments.push(`${varName} = ${buildFunc}(${value})`);
-        funcArgs.push(varName);
-        return;
-      }
-    }
-    
-    // Default handling
-    if (language === 'python') {
-      const sanitized = trimmed.replace(/([a-zA-Z_][a-zA-Z0-9_]*)\s+([a-zA-Z_])/g, '$1_$2');
-      assignments.push(sanitized);
-      const varName = sanitized.split('=')[0].trim();
-      if (varName) funcArgs.push(varName);
-    } else {
-      const sanitized = trimmed.replace(/([a-zA-Z_$][a-zA-Z0-9_$]*)\s+([a-zA-Z_$])/g, '$1_$2');
-      assignments.push(sanitized);
-      const varName = sanitized.split('=')[0].trim();
-      if (varName) funcArgs.push(varName);
-    }
-  });
-  
-  return { assignments, funcArgs };
-};
-
-/**
- * Tree and List helper code for JavaScript
- */
-const getJavaScriptHelpers = () => ({
-  treeNode: `
-class TreeNode {
-  constructor(val, left = null, right = null) {
-    this.val = val;
-    this.left = left;
-    this.right = right;
-  }
-}
-
-function buildTree(arr) {
-  if (!arr || arr.length === 0) return null;
-  const root = new TreeNode(arr[0]);
-  const queue = [root];
-  let i = 1;
-  while (queue.length > 0 && i < arr.length) {
-    const node = queue.shift();
-    if (i < arr.length && arr[i] !== null) {
-      node.left = new TreeNode(arr[i]);
-      queue.push(node.left);
-    }
-    i++;
-    if (i < arr.length && arr[i] !== null) {
-      node.right = new TreeNode(arr[i]);
-      queue.push(node.right);
-    }
-    i++;
-  }
-  return root;
-}
-
-function treeToArray(root) {
-  if (!root) return [];
-  const result = [];
-  const queue = [root];
-  while (queue.length > 0) {
-    const node = queue.shift();
-    if (node) {
-      result.push(node.val);
-      queue.push(node.left);
-      queue.push(node.right);
-    } else {
-      result.push(null);
-    }
-  }
-  while (result.length > 0 && result[result.length - 1] === null) {
-    result.pop();
-  }
-  return result;
-}
-`,
-  listNode: `
-class ListNode {
-  constructor(val, next = null) {
-    this.val = val;
-    this.next = next;
-  }
-}
-
-function buildList(arr) {
-  if (!arr || arr.length === 0) return null;
-  const dummy = new ListNode(0);
-  let current = dummy;
-  for (const val of arr) {
-    current.next = new ListNode(val);
-    current = current.next;
-  }
-  return dummy.next;
-}
-`
-});
-
-/**
- * Tree and List helper code for Python
- */
-const getPythonHelpers = () => `
-class TreeNode:
-    def __init__(self, val=0, left=None, right=None):
-        self.val = val
-        self.left = left
-        self.right = right
-
-def build_tree(arr):
-    if not arr:
-        return None
-    root = TreeNode(arr[0])
-    queue = [root]
-    i = 1
-    while queue and i < len(arr):
-        node = queue.pop(0)
-        if i < len(arr) and arr[i] is not None:
-            node.left = TreeNode(arr[i])
-            queue.append(node.left)
-        i += 1
-        if i < len(arr) and arr[i] is not None:
-            node.right = TreeNode(arr[i])
-            queue.append(node.right)
-        i += 1
-    return root
-
-class ListNode:
-    def __init__(self, val=0, next=None):
-        self.val = val
-        self.next = next
-
-def build_list(arr):
-    if not arr:
-        return None
-    dummy = ListNode(0)
-    current = dummy
-    for val in arr:
-        current.next = ListNode(val)
-        current = current.next
-    return dummy.next
-
-def tree_to_array(root):
-    if not root:
-        return []
-    result = []
-    queue = [root]
-    while queue:
-        node = queue.pop(0)
-        if node:
-            result.append(node.val)
-            queue.append(node.left)
-            queue.append(node.right)
-        else:
-            result.append(None)
-    while result and result[-1] is None:
-        result.pop()
-    return result
-`;
-
 /**
  * Helper to get C/C++ headers and utilities
  */
@@ -753,303 +567,125 @@ export default function TestInterface() {
       return normalizeLineEndings(code);
     }
 
-    // For Python, normalize indentation to ensure consistent 4-space indentation
-    const normalizePythonIndentation = (code) => {
-      const lines = code.split('\n');
-      const normalizedLines = [];
-      
-      for (let line of lines) {
-        // Convert tabs to 4 spaces
-        const normalizedLine = line.replace(/\t/g, '    ');
-        normalizedLines.push(normalizedLine);
-      }
-      
-      return normalizedLines.join('\n');
-    };
-
+    // Delegate to language-specific harness generators
     switch (lang) {
-      case 'javascript': {
-        // Check if this is a tree or linked list problem using utility
-        const isTreeOrLinkedListProblemFlag = isTreeOrLinkedListProblem(questionData, normalizedCode);
-        
-        // Get helpers using utility functions
-        const helpers = getJavaScriptHelpers();
-        const dataStructureHelpers = isTreeOrLinkedListProblemFlag ? (helpers.treeNode + helpers.listNode) : '';
-        
-        // If user didn't define a commonly used function name (e.g. countBits),
-        // inject a safe fallback implementation so tests that call it don't fail.
-        const needsCountBitsFallback = functionName === 'countBits' && !/\bcountBits\b\s*(?:=|\(|:|function)/.test(normalizedCode);
-        const countBitsFallback = `function countBits(n) { const ans = new Array(n + 1).fill(0); for (let i = 1; i <= n; i++) { ans[i] = ans[i >> 1] + (i & 1); } return ans; }`;
-
-        // Very simple JavaScript harness
-        const harness = `
-      ${dataStructureHelpers}${needsCountBitsFallback ? countBitsFallback + '\n\n' : ''}${normalizedCode}
-
-// Test runner
-console.log("=== TEST RESULTS ===");
-${validTestCases.map((testCase, index) => {
-  const rawInput = typeof testCase.input === 'string' ? testCase.input : '';
-  let expected = testCase.expected;
-  
-  // Convert string booleans to actual booleans
-  if (typeof expected === 'string') {
-    const lower = expected.toLowerCase().trim();
-    if (lower === 'true') expected = true;
-    else if (lower === 'false') expected = false;
-    else {
-      try { 
-        expected = JSON.parse(expected); 
-      } catch (e) { 
-        console.warn('Failed to parse expected value as JSON:', expected, e.message); 
-      }
-    }
-  }
-  
-  // Use utility function to process test input
-  const { assignments, funcArgs } = processTestInput(rawInput, isTreeOrLinkedListProblemFlag, 'javascript');
-  
-  const expectedIsArray = Array.isArray(expected);
-  const testCode = expectedIsArray ? `
-try {
-  ${assignments.join(';\n  ')};
-  let result = ${functionName}(${funcArgs.join(', ')});
-  const expected = ${JSON.stringify(expected)};
-  if (result && result.val !== undefined && Array.isArray(expected)) {
-    result = treeToArray(result);
-  }
-  const passed = JSON.stringify(result) === JSON.stringify(expected);
-  console.log(JSON.stringify({test: ${index + 1}, status: passed ? "PASS" : "FAIL"}));
-} catch (e) {
-  console.log(JSON.stringify({test: ${index + 1}, status: "ERROR", error: e.message}));
-}` : `
-try {
-  ${assignments.join(';\n  ')};
-  const result = ${functionName}(${funcArgs.join(', ')});
-  const expected = ${JSON.stringify(expected)};
-  const passed = JSON.stringify(result) === JSON.stringify(expected);
-  console.log(JSON.stringify({test: ${index + 1}, status: passed ? "PASS" : "FAIL"}));
-} catch (e) {
-  console.log(JSON.stringify({test: ${index + 1}, status: "ERROR", error: e.message}));
-}`;
-  return testCode;
-}).join('')}
-console.log("=== EXECUTION COMPLETE ===");
-`;
-        return harness;
-      }
-
-      case 'python': {
-        // Normalize Python indentation
-        const pythonNormalizedCode = normalizePythonIndentation(normalizedCode);
-        
-        // Check if this is a tree or linked list problem using utility
-        const isTreeOrLinkedListProblemFlag = isTreeOrLinkedListProblem(questionData, normalizedCode);
-        
-        // Get Python helpers using utility function
-        const pythonHelpers = isTreeOrLinkedListProblemFlag ? getPythonHelpers() : '';
-        
-        // Very simple Python harness
-        const harness = (() => {
-          const testCode = validTestCases.map((tc, idx) => {
-            const inputStr = typeof tc.input === 'string' ? tc.input : '';
-            let expected = tc.expected;
-            
-            // Convert string booleans to actual booleans
-            if (typeof expected === 'string') {
-              const lower = expected.toLowerCase().trim();
-              if (lower === 'true') expected = true;
-              else if (lower === 'false') expected = false;
-            }
-            
-            // For Python, use True/False (capital) for booleans, and handle numeric strings properly
-            let expectedPython;
-            if (expected === true) expectedPython = 'True';
-            else if (expected === false) expectedPython = 'False';
-            else if (typeof expected === 'string') {
-              // Try to parse as JSON first (handles arrays like "[0,1]")
-              try {
-                const parsed = JSON.parse(expected);
-                expectedPython = JSON.stringify(parsed);
-              } catch {
-                // If not JSON, check if it's a numeric string
-                if (!isNaN(expected) && expected.trim() !== '') {
-                  expectedPython = expected.trim();
-                } else {
-                  // For plain strings, use repr-like formatting
-                  expectedPython = JSON.stringify(expected);
-                }
-              }
-            } else if (typeof expected === 'number') {
-              expectedPython = String(expected);
-            } else {
-              // For arrays and objects, stringify them
-              try {
-                expectedPython = JSON.stringify(expected);
-              } catch (parseError) {
-                console.error('Failed to stringify expected value:', parseError);
-                expectedPython = String(expected);
-              }
-            }
-            
-  // Use utility function to process test input
-  const { assignments, funcArgs } = processTestInput(inputStr, isTreeOrLinkedListProblemFlag, 'python');            
-            // Escape the expected value for proper Python string embedding
-            const expectedPythonEscaped = expectedPython.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-            
-            // Convert JavaScript boolean to Python boolean (True/False with capital first letter)
-            const expectedIsArray = Array.isArray(expected);
-            const expectedIsArrayPython = expectedIsArray ? 'True' : 'False';
-            
-            return `  try:
-    import json
-    ${assignments.join('\n    ')}
-    # Try calling as a method of Solution class, fallback to standalone function
-    try:
-      result = solution.${functionName}(${funcArgs.join(', ')})
-    except (AttributeError, NameError):
-      result = ${functionName}(${funcArgs.join(', ')})
-    
-    # Parse expected value (handles arrays, objects, primitives)
-    expected_str = "${expectedPythonEscaped}"
-    try:
-      expected = json.loads(expected_str)
-    except:
-      # Fallback for simple values
-      if expected_str.strip() in ['True', 'true']:
-        expected = True
-      elif expected_str.strip() in ['False', 'false']:
-        expected = False
-      else:
-        try:
-          expected = eval(expected_str.strip())
-        except:
-          expected = expected_str.strip()
-    
-    # If result is a TreeNode and expected is a list, convert tree to array
-    if ${expectedIsArrayPython} and result and hasattr(result, 'val'):
-      result = tree_to_array(result)
-    
-    # Compare results with flexible matching
-    try:
-      passed = result == expected or json.dumps(result, sort_keys=True) == json.dumps(expected, sort_keys=True)
-    except:
-      passed = str(result) == str(expected)
-    
-    print(json.dumps({"test": ${idx + 1}, "status": "PASS" if passed else "FAIL"}))
-  except Exception as e:
-    print(json.dumps({"test": ${idx + 1}, "status": "ERROR", "error": str(e)}))`;
-          }).join('\n');
-
-          return `${pythonHelpers}${pythonNormalizedCode}
-
-if __name__ == "__main__":
-  # Check if Solution class exists in user code
-  try:
-    solution = Solution()
-  except NameError:
-    solution = None
-  print("=== TEST RESULTS ===")
-${testCode}
-  print("=== EXECUTION COMPLETE ===")`;
-        })();
-        return harness.replace(/\r\n/g, '\n');
-      }
-
-      case 'java': {
-        // Extract imports from user code and place them at top level
-        const importLines = [];
-        const codeLines = [];
-        
-        normalizedCode.split('\n').forEach(line => {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('import ')) {
-            importLines.push(trimmed);
-          } else {
-            codeLines.push(line);
-          }
-        });
-        
-        const userCodeWithoutImports = codeLines.join('\n');
-        
-        const harness = (() => {
-          const testCode = validTestCases.map((tc, idx) => {
-            const inputStr = typeof tc.input === 'string' ? tc.input : '';
-            let expected = tc.expected;
-            
-            // Convert string booleans to actual booleans
-            if (typeof expected === 'string') {
-              const lower = expected.toLowerCase().trim();
-              if (lower === 'true') expected = true;
-              else if (lower === 'false') expected = false;
-            }
-            
-            // For Java, use true/false (lowercase) for booleans
-            const expectedJava = expected === true ? 'true' : expected === false ? 'false' : expected;
-            
-  // Parse input to extract variable assignments and function arguments
-  const assignments = [];
-  const funcArgs = [];
-  
-  // Use utility function to parse input
-  const parts = parseInputString(inputStr);
-  
-  // Fallback to original assignment-style parsing for all cases
-  parts.forEach(part => {
-    const trimmed = part.trim();
-    if (trimmed) {
-      // Convert Python-style arrays to Java arrays
-      let converted = trimmed;
+      case 'javascript':
+        return generateJavaScriptHarness(normalizedCode, functionName, validTestCases, questionData);
       
-      // Handle 2D arrays like image = [[1,1,1],[1,1,0],[1,0,1]]
-      const twoDArrayMatch = trimmed.match(/(\w+)\s*=\s*(\[\[.*\]\])/);
-      if (twoDArrayMatch) {
-        const varName = twoDArrayMatch[1];
-        const arrayStr = twoDArrayMatch[2];
-        try {
-          // Parse the nested array and convert to Java 2D array syntax
-          const parsed = JSON.parse(arrayStr);
-          if (Array.isArray(parsed) && parsed.length > 0 && Array.isArray(parsed[0])) {
-            // It's a 2D array
-            const javaArray = parsed.map(row => `{${row.join(',')}}`).join(',');
-            converted = `int[][] ${varName} = {${javaArray}};`;
-          }
-        } catch {
-          // Fallback to original if parsing fails
-          converted = trimmed;
-        }
+      case 'python':
+        return generatePythonHarness(normalizedCode, functionName, validTestCases, questionData);
+      
+      case 'java':
+        return generateJavaHarness(normalizedCode, functionName, validTestCases);
+      
+      case 'c':
+      case 'c++':
+        return generateCCPPHarness(normalizedCode, functionName, validTestCases);
+      
+      default:
+        console.warn(`Language '${lang}' is not fully supported. Supported languages: JavaScript, Python, Java, C, C++. Using basic code normalization.`);
+        return normalizeLineEndings(normalizedCode);
+    }
+  };
+
+  /**
+   * Generates Java test harness (inline for now, can be extracted later)
+   */
+  const generateJavaHarness = (normalizedCode, functionName, validTestCases) => {
+    // Extract imports from user code and place them at top level
+    const importLines = [];
+    const codeLines = [];
+    
+    normalizedCode.split('\n').forEach(line => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('import ')) {
+        importLines.push(trimmed);
       } else {
-        // Handle 1D arrays
-        const oneDArrayMatch = trimmed.match(/(\w+)\s*=\s*\[([^\]]*)\]/);
-        if (oneDArrayMatch) {
-          const varName = oneDArrayMatch[1];
-          const arrayContent = oneDArrayMatch[2];
-          // Check if it's an integer array by looking at the content
-          const isIntArray = /^\s*\d+(\s*,\s*\d+)*\s*$/.test(arrayContent);
-          if (isIntArray) {
-            converted = `int[] ${varName} = {${arrayContent}};`;
-          } else {
-            // For non-integer arrays, keep as is for now
-            converted = trimmed;
-          }
-        } else {
-          // Handle simple integer assignments like 'sr = 1'
-          const intMatch = trimmed.match(/(\w+)\s*=\s*(\d+)/);
-          if (intMatch) {
-            converted = `int ${intMatch[1]} = ${intMatch[2]};`;
-          } else {
-            // Keep as is for other cases
-            converted = trimmed;
-          }
-        }
+        codeLines.push(line);
+      }
+    });
+    
+    const userCodeWithoutImports = codeLines.join('\n');
+    
+    const testCode = validTestCases.map((tc, idx) => {
+      const inputStr = typeof tc.input === 'string' ? tc.input : '';
+      let expected = tc.expected;
+      
+      // Convert string booleans to actual booleans
+      if (typeof expected === 'string') {
+        const lower = expected.toLowerCase().trim();
+        if (lower === 'true') expected = true;
+        else if (lower === 'false') expected = false;
       }
       
-      assignments.push(converted);
-      // Extract variable name from assignment
-      const varMatch = converted.match(/(\w+)\s*=/);
-      if (varMatch) funcArgs.push(varMatch[1]);
-    }
-  });
-            return `        try {
+      // For Java, use true/false (lowercase) for booleans
+      const expectedJava = expected === true ? 'true' : expected === false ? 'false' : expected;
+      
+      // Parse input to extract variable assignments and function arguments
+      const assignments = [];
+      const funcArgs = [];
+      
+      // Use utility function to parse input
+      const parts = parseInputString(inputStr);
+      
+      // Fallback to original assignment-style parsing for all cases
+      parts.forEach(part => {
+        const trimmed = part.trim();
+        if (trimmed) {
+          // Convert Python-style arrays to Java arrays
+          let converted = trimmed;
+          
+          // Handle 2D arrays like image = [[1,1,1],[1,1,0],[1,0,1]]
+          const twoDArrayMatch = trimmed.match(/(\w+)\s*=\s*(\[\[.*\]\])/);
+          if (twoDArrayMatch) {
+            const varName = twoDArrayMatch[1];
+            const arrayStr = twoDArrayMatch[2];
+            try {
+              // Parse the nested array and convert to Java 2D array syntax
+              const parsed = JSON.parse(arrayStr);
+              if (Array.isArray(parsed) && parsed.length > 0 && Array.isArray(parsed[0])) {
+                // It's a 2D array
+                const javaArray = parsed.map(row => `{${row.join(',')}}`).join(',');
+                converted = `int[][] ${varName} = {${javaArray}};`;
+              }
+            } catch {
+              // Fallback to original if parsing fails
+              converted = trimmed;
+            }
+          } else {
+            // Handle 1D arrays
+            const oneDArrayMatch = trimmed.match(/(\w+)\s*=\s*\[([^\]]*)\]/);
+            if (oneDArrayMatch) {
+              const varName = oneDArrayMatch[1];
+              const arrayContent = oneDArrayMatch[2];
+              // Check if it's an integer array by looking at the content
+              const isIntArray = /^\s*\d+(\s*,\s*\d+)*\s*$/.test(arrayContent);
+              if (isIntArray) {
+                converted = `int[] ${varName} = {${arrayContent}};`;
+              } else {
+                // For non-integer arrays, keep as is for now
+                converted = trimmed;
+              }
+            } else {
+              // Handle simple integer assignments like 'sr = 1'
+              const intMatch = trimmed.match(/(\w+)\s*=\s*(\d+)/);
+              if (intMatch) {
+                converted = `int ${intMatch[1]} = ${intMatch[2]};`;
+              } else {
+                // Keep as is for other cases
+                converted = trimmed;
+              }
+            }
+          }
+          
+          assignments.push(converted);
+          // Extract variable name from assignment
+          const varMatch = converted.match(/(\w+)\s*=/);
+          if (varMatch) funcArgs.push(varMatch[1]);
+        }
+      });
+      
+      return `        try {
             ${assignments.join(';\n            ')};
             ${functionName === 'floodFill' ? 'int[][]' : typeof expected === 'string' && !isNaN(expected) ? 'int' : expected === true || expected === false ? 'boolean' : 'Object'} result = solution.${functionName}(${funcArgs.join(', ')});
             boolean passed;
@@ -1089,9 +725,9 @@ ${testCode}
         } catch (Exception e) {
             System.out.println("{\\"test\\":${idx + 1},\\"status\\":\\"ERROR\\",\\"error\\":\\"" + e.getMessage() + "\\"}");
         }`;
-          }).join('\n');
+    }).join('\n');
 
-          return `${importLines.length > 0 ? importLines.join('\n') + '\n\n' : ''}import java.util.*;
+    return `${importLines.length > 0 ? importLines.join('\n') + '\n\n' : ''}import java.util.*;
 
 public class Main {
     ${userCodeWithoutImports.replace(/^/gm, '    ').replace(/class\s+\w+/g, 'static class Solution')}
@@ -1102,40 +738,31 @@ public class Main {
 ${testCode}
         System.out.println("=== EXECUTION COMPLETE ===");
     }
-}`;
-        })();
+}`.replace(/\r\n/g, '\n');
+  };
 
-        return harness.replace(/\r\n/g, '\n');
-      }
-
-      case 'c':
-      case 'c++': {
-        // C/C++ test harness generation with enhanced data type support
-        const cppHelpers = getCCPPHelpers();
-        
-        const harness = `
-${cppHelpers}
-
-${normalizedCode}
-
-int main() {
-    printf("=== TEST RESULTS ===\\n");
-${validTestCases.map((testCase, index) => {
-  const inputStr = typeof testCase.input === 'string' ? testCase.input : '';
-  let expected = testCase.expected;
-  
-  // Detect input type
-  const isArrayInput = /^\[.*\]$/.test(inputStr.trim());
-  const isStringInput = /^["'].*["']$/.test(inputStr.trim());
-  const isMultipleInputs = inputStr.includes(',') && !isArrayInput;
-  
-  // Generate test code based on input type
-  let testCode = '';
-  
-  if (isArrayInput) {
-    // Array input handling
-    const expectedStr = Array.isArray(expected) ? `[${expected.join(',')}]` : String(expected);
-    testCode = `
+  /**
+   * Generates C/C++ test harness (inline for now, can be extracted later)
+   */
+  const generateCCPPHarness = (normalizedCode, functionName, validTestCases) => {
+    const cppHelpers = getCCPPHelpers();
+    
+    const testCode = validTestCases.map((testCase, index) => {
+      const inputStr = typeof testCase.input === 'string' ? testCase.input : '';
+      let expected = testCase.expected;
+      
+      // Detect input type
+      const isArrayInput = /^\[.*\]$/.test(inputStr.trim());
+      const isStringInput = /^["'].*["']$/.test(inputStr.trim());
+      const isMultipleInputs = inputStr.includes(',') && !isArrayInput;
+      
+      // Generate test code based on input type
+      let testCode = '';
+      
+      if (isArrayInput) {
+        // Array input handling
+        const expectedStr = Array.isArray(expected) ? `[${expected.join(',')}]` : String(expected);
+        testCode = `
     // Test ${index + 1}: Array input
     {
         int size;
@@ -1152,10 +779,10 @@ ${validTestCases.map((testCase, index) => {
         `}
         printf("{\\"test\\":${index + 1},\\"status\\":\\"%s\\"}\\n", passed ? "PASS" : "FAIL");
     }`;
-  } else if (isStringInput) {
-    // String input handling
-    const expectedStr = typeof expected === 'string' ? expected.replace(/['"]/g, '') : String(expected);
-    testCode = `
+      } else if (isStringInput) {
+        // String input handling
+        const expectedStr = typeof expected === 'string' ? expected.replace(/['"]/g, '') : String(expected);
+        testCode = `
     // Test ${index + 1}: String input
     {
         char* input = parseString("${inputStr}");
@@ -1170,18 +797,18 @@ ${validTestCases.map((testCase, index) => {
         `}
         printf("{\\"test\\":${index + 1},\\"status\\":\\"%s\\"}\\n", passed ? "PASS" : "FAIL");
     }`;
-  } else if (isMultipleInputs) {
-    // Multiple simple inputs (e.g., "x=5, y=10")
-    const inputs = inputStr.split(',').map(s => s.trim());
-    const assignments = inputs.map(input => {
-      const match = input.match(/(\w+)\s*=\s*(.+)/);
-      if (match) {
-        return `int ${match[1]} = ${match[2]};`;
-      }
-      return '';
-    }).filter(Boolean);
-    
-    testCode = `
+      } else if (isMultipleInputs) {
+        // Multiple simple inputs (e.g., "x=5, y=10")
+        const inputs = inputStr.split(',').map(s => s.trim());
+        const assignments = inputs.map(input => {
+          const match = input.match(/(\w+)\s*=\s*(.+)/);
+          if (match) {
+            return `int ${match[1]} = ${match[2]};`;
+          }
+          return '';
+        }).filter(Boolean);
+        
+        testCode = `
     // Test ${index + 1}: Multiple inputs
     {
         ${assignments.join('\n        ')}
@@ -1190,10 +817,10 @@ ${validTestCases.map((testCase, index) => {
         bool passed = (result == expectedValue);
         printf("{\\"test\\":${index + 1},\\"status\\":\\"%s\\"}\\n", passed ? "PASS" : "FAIL");
     }`;
-  } else {
-    // Simple single input
-    const cleanInput = inputStr.replace(/[a-zA-Z_]\w*\s*=\s*/, '');
-    testCode = `
+      } else {
+        // Simple single input
+        const cleanInput = inputStr.replace(/[a-zA-Z_]\w*\s*=\s*/, '');
+        testCode = `
     // Test ${index + 1}: Simple input
     {
         int input = ${cleanInput};
@@ -1210,22 +837,23 @@ ${validTestCases.map((testCase, index) => {
         printf("{\\"test\\":${index + 1},\\"status\\":\\"%s\\"}\\n", passed ? "PASS" : "FAIL");
         `}
     }`;
-  }
-  
-  return testCode;
-}).join('')}
+      }
+      
+      return testCode;
+    }).join('');
+
+    return `
+${cppHelpers}
+
+${normalizedCode}
+
+int main() {
+    printf("=== TEST RESULTS ===\\n");
+${testCode}
     printf("=== EXECUTION COMPLETE ===\\n");
     return 0;
 }
-`;
-        return harness.replace(/\r\n/g, '\n');
-      }
-
-      default:
-        // For other languages, preserve original line endings/spacing
-        console.warn(`Language '${lang}' is not fully supported. Supported languages: JavaScript, Python, Java, C, C++. Using basic code normalization.`);
-        return normalizeLineEndings(normalizedCode);
-    }
+`.replace(/\r\n/g, '\n');
   };
 
   // Helper function to calculate code complexity score and metrics
