@@ -40,6 +40,34 @@ const CONFIG = {
   }
 };
 
+/**
+ * OPTIMIZATION ANALYSIS ARCHITECTURE
+ * 
+ * This file uses a dual-method approach for code optimization analysis:
+ * 
+ * 1. PRIMARY METHOD - AI-Based Analysis (analyzeWithMistral):
+ *    - Uses Ollama/Mistral AI for comprehensive code analysis
+ *    - Detects optimal algorithms (Boyer-Moore, Binary Search, etc.)
+ *    - Provides accurate optimization percentages (0-100%)
+ *    - Returns detailed feedback, suggestions, and code examples
+ *    - Called via: analyzeOptimization() or getAIOptimizationPercentage()
+ * 
+ * 2. FALLBACK METHOD - Complexity-Based Estimation:
+ *    - Used when AI is unavailable (Ollama not running, network issues)
+ *    - Simple heuristic based on code metrics (lines, loops, conditionals)
+ *    - Less accurate but always available
+ *    - Used in: evaluateAgainstTestCases() and analyzeWithMistral() catch block
+ * 
+ * DISPLAY PRIORITY (see displayedRefactoringPercentage):
+ *    1. AI optimization percentage (if available)
+ *    2. Optimization result from analyzeOptimization
+ *    3. Submission result from submitCode
+ *    4. Default: 0%
+ * 
+ * RECOMMENDATION: Always use AI-based analysis for accurate results.
+ * The complexity-based fallback is intentionally simple and serves as a last resort.
+ */
+
 // Utility Functions - Extract common logic for reusability
 
 /**
@@ -120,21 +148,24 @@ const callOllamaAPI = async (prompt) => {
   
   console.log('Mistral raw response:', aiResponse);
 
-  // Extract percentage from response
+  // Extract percentage from AI response with robust fallback handling
+  // Try to find explicit percentage first (e.g., "50%")
   const percentageMatch = aiResponse.match(/(\d+)%/);
   let percentage = CONFIG.AI_SETTINGS.DEFAULT_FALLBACK_PERCENTAGE;
   
   if (percentageMatch) {
     percentage = parseInt(percentageMatch[1]);
   } else {
-    // Try to extract any number from response
+    // If no percentage format found, try to extract any standalone number
     const numberMatch = aiResponse.match(/\b(\d{1,3})\b/);
     if (numberMatch) {
       percentage = parseInt(numberMatch[1]);
     }
+    // If still no number found, defaults to CONFIG.AI_SETTINGS.DEFAULT_FALLBACK_PERCENTAGE (50%)
+    // This ensures we always return a reasonable value even if AI response is unparseable
   }
 
-  // Ensure percentage is within bounds
+  // Ensure percentage is within valid bounds (0-100)
   return Math.max(0, Math.min(100, percentage));
 };
 
@@ -521,24 +552,27 @@ export default function TestInterface() {
 
   // Helper function to prepare code for execution with test cases (Refactored)
   const prepareCodeForExecution = (code, lang, questionData) => {
+    // Normalize language to lowercase for consistent switch case matching
+    const normalizedLang = (lang || '').toLowerCase().trim();
+    
     // Use utility functions
     const userCodeRaw = normalizeLineEndings(code);
     
     // Normalize indentation: convert tabs to spaces (4 for Python, 2 for others)
-    const tabSize = lang === 'python' ? 4 : 2;
+    const tabSize = normalizedLang === 'python' ? 4 : 2;
     let normalizedCode = userCodeRaw.replace(/\t/g, ' '.repeat(tabSize));
     
     // Trim trailing whitespace from each line
     normalizedCode = normalizedCode.split('\n').map(line => line.trimEnd()).join('\n');
     
     // Extract function name using utility
-    let functionName = extractFunctionName(normalizedCode, lang);
+    let functionName = extractFunctionName(normalizedCode, normalizedLang);
     
     // FALLBACK: If no function found in code, try to extract from signature
     if (functionName === 'solution') {
       try {
         const sig = (questionData && questionData.functionSignature) || '';
-        if (lang === 'python') {
+        if (normalizedLang === 'python') {
           const m = sig.match(/def\s+([A-Za-z_]\w*)/);
           if (m) functionName = m[1];
         } else {
@@ -567,8 +601,11 @@ export default function TestInterface() {
       return normalizeLineEndings(code);
     }
 
+    // Debug: Log language for verification
+    console.log(`[prepareCodeForExecution] Language: "${lang}" -> Normalized: "${normalizedLang}"`);
+
     // Delegate to language-specific harness generators
-    switch (lang) {
+    switch (normalizedLang) {
       case 'javascript':
         return generateJavaScriptHarness(normalizedCode, functionName, validTestCases, questionData);
       
@@ -583,7 +620,7 @@ export default function TestInterface() {
         return generateCCPPHarness(normalizedCode, functionName, validTestCases);
       
       default:
-        console.warn(`Language '${lang}' is not fully supported. Supported languages: JavaScript, Python, Java, C, C++. Using basic code normalization.`);
+        console.warn(`Language '${normalizedLang}' (original: '${lang}') is not fully supported. Supported languages: JavaScript, Python, Java, C, C++. Using basic code normalization.`);
         return normalizeLineEndings(normalizedCode);
     }
   };
@@ -943,90 +980,27 @@ ${testCode}
     const anyPassed = passedTests > 0;
     const hasErrors = errorTests > 0;
 
-    // Calculate code complexity and metrics
+    // Simple complexity-based fallback (only used if AI analysis is unavailable)
+    // Primary optimization analysis should use AI via analyzeWithMistral()
     const complexity = calculateComplexityScore(userCode);
     const complexityScore = complexity.score;
 
-    // Detect simple inefficiency patterns to be stricter about "0%"
-    const hasSort = /\.sort\s*\(|\bsort\s*\(/i.test(userCode);
-    const hasNestedLoops = /for\s*\([^)]*\)\s*\{[\s\S]{0,400}?for\s*\(/i.test(userCode) || /for\s*\([^)]*\)\s*\{[\s\S]{0,400}?while\s*\(/i.test(userCode);
-    
-    // Check if this is a problem type where recursion is optimal
-    const isTreeProblem = /tree|node|root|left|right|parent|child/i.test(userCode) || (currentQuestionData && /tree|node|subtree/i.test(currentQuestionData.problem || ''));
-    const isGraphProblem = /graph|vertex|edge|adjacency|dfs|bfs/i.test(userCode) || (currentQuestionData && /graph|vertex|edge/i.test(currentQuestionData.problem || ''));
-    const isLinkedListProblem = /head|next|ListNode|linkedlist|linked list/i.test(userCode) || (currentQuestionData && /linked list|listnode/i.test(currentQuestionData.problem || ''));
-    const isBacktrackingProblem = /backtrack|permutation|combination|subset/i.test(userCode) || (currentQuestionData && /permutation|combination|subset|backtrack/i.test(currentQuestionData.problem || ''));
-    const isDivideConquerProblem = /merge.*sort|quick.*sort|divide.*conquer/i.test(userCode) || (currentQuestionData && /merge sort|quick sort|divide and conquer/i.test(currentQuestionData.problem || ''));
-    const hasMemoization = /memo|cache|dp|dynamic/i.test(userCode);
-    
-    // Only flag recursion as inefficient if it's NOT for problems where recursion is optimal
-    // Improved: detect both direct recursion (funcA calls funcA) and helper function recursion (funcA contains funcB that calls funcB)
-    const hasRecursion = /\b([a-zA-Z_][\w]*)\s*\([^)]*\)\s*\{[\s\S]*\b\1\s*\(/.test(userCode) || 
-                         /const\s+([a-zA-Z_][\w]*)\s*=\s*\([^)]*\)\s*=>\s*\{[\s\S]{0,500}?\b\1\s*\(/.test(userCode) ||
-                         /function\s+([a-zA-Z_][\w]*)\s*\([^)]*\)\s*\{[\s\S]{0,500}?\b\1\s*\(/.test(userCode);
-    const hasInefficientRecursion = hasRecursion && !isTreeProblem && !isGraphProblem && !isLinkedListProblem && !isBacktrackingProblem && !isDivideConquerProblem && !hasMemoization;
-    
-    const hasInefficientPattern = hasSort || hasNestedLoops || hasInefficientRecursion;
-
-    // Detect known optimal algorithms
-    const isBoyerMoore = /count\s*=\s*0/i.test(userCode) && /candidate/i.test(userCode) && /count\s*\+\+|count\s*--/i.test(userCode);
-    const isBinarySearch = /while\s*\(\s*l\s*<=\s*r\s*\)/i.test(userCode) && /Math\.floor\s*\(\s*\(\s*l\s*\+\s*r\s*\)\s*\/\s*2\s*\)/i.test(userCode);
-    
-    // Detect optimal tree traversal patterns (recursive DFS is optimal for trees)
-    const isOptimalTreeTraversal = isTreeProblem && hasRecursion && 
-      (/\.left|\['left'\]|\["left"\]/i.test(userCode) || /\.right|\['right'\]|\["right"\]/i.test(userCode));
-    
-    // Detect optimal subtree checking (recursive comparison is standard)
-    const isOptimalSubtree = /subtree/i.test(currentQuestionData?.problem || '') && 
-      /isSameTree|isSame|isIdentical|isEqual/i.test(userCode) && hasRecursion;
-    
-    // Detect optimal linked list recursion (recursive is natural and optimal for many LL problems)
-    const isOptimalLinkedListRecursion = isLinkedListProblem && hasRecursion && 
-      (/\.next|\['next'\]|\["next"\]/i.test(userCode) || /head|node/i.test(userCode));
-    
-    // Detect optimal backtracking (recursion is the standard approach)
-    const isOptimalBacktracking = isBacktrackingProblem && hasRecursion;
-    
-    // Detect optimal divide & conquer (merge sort, quick sort, etc.)
-    const isOptimalDivideConquer = isDivideConquerProblem && hasRecursion;
-    
-    // Detect DP with memoization (recursion + caching is optimal)
-    const isOptimalDPWithMemo = hasRecursion && hasMemoization;
-    
-    const isOptimalAlgorithm = isBoyerMoore || isBinarySearch || isOptimalTreeTraversal || isOptimalSubtree || 
-                               isOptimalLinkedListRecursion || isOptimalBacktracking || isOptimalDivideConquer || isOptimalDPWithMemo;
-
-    // Compute a refactoring percentage based on test results and code complexity
+    // Compute a basic refactoring percentage as fallback
+    // This is a simple heuristic - AI analysis (analyzeWithMistral) provides much more accurate results
     let refactoringPercentage;
     if (totalTests > 0) {
       if (allPassed) {
-        // Allow 0% for optimal algorithms
-        if (isOptimalAlgorithm) {
-          refactoringPercentage = 0;
-        } else {
-          // Base percent from complexity (higher complexity = more refactor needed)
-          let base = Math.round(complexityScore * 0.5);
-          
-          // Increase for clearly inefficient patterns
-          if (hasInefficientPattern) {
-            base = Math.round(complexityScore * 0.7);
-          }
-          
-          // No forced minimums - let natural complexity score determine percentage
-          refactoringPercentage = Math.min(100, base);
-        }
+        // Base percentage from code complexity (0-100)
+        // Use moderate multiplier for reasonable fallback estimates
+        refactoringPercentage = Math.min(100, Math.round(complexityScore * 0.5));
       } else {
-        // If some tests fail, use failure rate
+        // If tests fail, base percentage on failure rate
         const failureBased = Math.round((1 - (passedTests / totalTests)) * 100);
         refactoringPercentage = Math.min(100, failureBased);
       }
     } else {
-      // No tests found; use complexity analysis without forced minimums
-      let base = Math.round(complexityScore * 0.5);
-      if (hasInefficientPattern) {
-        base = Math.round(complexityScore * 0.7);
-      }
-      refactoringPercentage = Math.min(100, base);
+      // No tests found; use basic complexity score
+      refactoringPercentage = Math.min(100, Math.round(complexityScore * 0.5));
     }
 
     const refactoringPotential = `${refactoringPercentage}%`;
@@ -1093,15 +1067,16 @@ ${testCode}
 
     } catch (error) {
       console.error('Mistral AI analysis failed:', error);
-      // Fallback to complexity-based calculation
+      // Fallback to basic complexity-based estimation
+      // Note: This is a simple heuristic and less accurate than AI analysis
       const fallback = calculateComplexityScore(userCode);
-      const fallbackPercentage = fallback.score;
+      const fallbackPercentage = Math.min(100, Math.round(fallback.score * 0.5));
       
       return {
         optimizationPercentage: fallbackPercentage,
         refactoringPotential: `${fallbackPercentage}%`,
-        qualityFeedback: '⚠ AI analysis unavailable. Using code complexity analysis.',
-        optimizationSuggestions: 'Consider reviewing time/space complexity and code structure.',
+        qualityFeedback: '⚠ AI analysis unavailable. Using basic complexity estimation (less accurate).',
+        optimizationSuggestions: 'Consider reviewing time/space complexity and code structure. For accurate analysis, ensure Ollama/Mistral is running.',
         codeExample: ''
       };
     }
