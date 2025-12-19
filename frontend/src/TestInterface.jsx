@@ -1107,27 +1107,16 @@ ${testCode}
     }
   };
 
-  // Get AI optimization percentage only (Refactored with utilities)
+  // Get AI optimization percentage only (Refactored to use analyzeWithMistral)
   const getAIOptimizationPercentage = async (userCode, language, problem) => {
     setAiPercentageLoading(true);
     
     try {
-      // Use utility to create prompt
-      const percentagePrompt = createOptimizationPrompt(userCode, language, problem);
+      // Reuse analyzeWithMistral to get comprehensive analysis
+      const analysis = await analyzeWithMistral(userCode, language, problem);
       
-      // Call Ollama API using utility
-      let percentage = await callOllamaAPI(percentagePrompt);
-      
-      // Apply pattern-based adjustments using utility
-      percentage = applyPatternAdjustments(
-        percentage, 
-        userCode, 
-        problem, 
-        detectOptimalAlgorithms, 
-        getPatternSuggestions
-      );
-
-      setAiOptimizationPercentage(percentage);
+      // Extract just the percentage from the analysis
+      setAiOptimizationPercentage(analysis.optimizationPercentage);
     } catch (error) {
       console.error('AI percentage fetch failed:', error);
       setAiOptimizationPercentage(CONFIG.AI_SETTINGS.DEFAULT_FALLBACK_PERCENTAGE);
