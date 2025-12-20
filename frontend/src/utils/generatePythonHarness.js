@@ -117,40 +117,40 @@ ${validTestCases.map((testCase, index) => {
   const expectedIsArrayPython = expectedIsArray ? 'True' : 'False';
   
   return `  try:
-    import json
-    ${assignments.join('\n    ')}
-    # Try calling as a method of Solution class, fallback to standalone function
-    try:
-      result = solution.${functionName}(${funcArgs.join(', ')})
-    except (AttributeError, NameError):
-      result = ${functionName}(${funcArgs.join(', ')})
-    
-    # Parse expected value
-    expected_str = "${expectedPythonEscaped}"
-    try:
-      expected = json.loads(expected_str)
-    except:
-      if expected_str.strip() in ['True', 'true']:
-        expected = True
-      elif expected_str.strip() in ['False', 'false']:
-        expected = False
-      elif expected_str.strip() in ['None', 'null']:
-        expected = None
-      else:
-        try:
-          expected = eval(expected_str)
-        except:
-          expected = expected_str
-    
-    # Convert tree result to array if needed
-    if hasattr(result, 'val') and ${expectedIsArrayPython}:
-      result = tree_to_array(result)
-    
-    # Compare results
-    passed = json.dumps(result, sort_keys=True) == json.dumps(expected, sort_keys=True)
-    print(json.dumps({"test": ${index + 1}, "status": "PASS" if passed else "FAIL"}))
-except Exception as e:
-    print(json.dumps({"test": ${index + 1}, "status": "ERROR", "error": str(e)}))
+      import json
+      ${assignments.join('\n      ')}
+      # Try calling as a method of Solution class, fallback to standalone function
+      try:
+          result = solution.${functionName}(${funcArgs.join(', ')})
+      except (AttributeError, NameError):
+          result = ${functionName}(${funcArgs.join(', ')})
+      
+      # Parse expected value
+      expected_str = "${expectedPythonEscaped}"
+      try:
+          expected = json.loads(expected_str)
+      except:
+          if expected_str.strip() in ['True', 'true']:
+              expected = True
+          elif expected_str.strip() in ['False', 'false']:
+              expected = False
+          elif expected_str.strip() in ['None', 'null']:
+              expected = None
+          else:
+              try:
+                  expected = eval(expected_str)
+              except:
+                  expected = expected_str
+      
+      # Convert tree result to array if needed
+      if hasattr(result, 'val') and ${expectedIsArrayPython}:
+          result = tree_to_array(result)
+      
+      # Compare results
+      passed = json.dumps(result, sort_keys=True) == json.dumps(expected, sort_keys=True)
+      print(json.dumps({"test": ${index + 1}, "status": "PASS" if passed else "FAIL"}))
+  except Exception as e:
+      print(json.dumps({"test": ${index + 1}, "status": "ERROR", "error": str(e)}))
 `;
 }).join('')}
 print("=== EXECUTION COMPLETE ===")

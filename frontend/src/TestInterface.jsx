@@ -285,6 +285,26 @@ const validateTestCases = (testCases) => {
 /**
  * Checks if problem involves trees or linked lists
  */
+
+/**
+ * Helper to get Java class definitions for tree and linked list problems
+ */
+const getJavaHelpers = () => `
+    // Helper classes for tree and linked list problems
+    static class TreeNode {
+        int val;
+        TreeNode left;
+        TreeNode right;
+        TreeNode(int x) { val = x; }
+    }
+    
+    static class ListNode {
+        int val;
+        ListNode next;
+        ListNode(int x) { val = x; }
+    }
+`;
+
 /**
  * Helper to get C/C++ headers and utilities
  */
@@ -613,7 +633,7 @@ export default function TestInterface() {
         return generatePythonHarness(normalizedCode, functionName, validTestCases, questionData);
       
       case 'java':
-        return generateJavaHarness(normalizedCode, functionName, validTestCases);
+        return generateJavaHarness(normalizedCode, functionName, validTestCases, questionData);
       
       case 'c':
       case 'c++':
@@ -628,7 +648,7 @@ export default function TestInterface() {
   /**
    * Generates Java test harness (inline for now, can be extracted later)
    */
-  const generateJavaHarness = (normalizedCode, functionName, validTestCases) => {
+  const generateJavaHarness = (normalizedCode, functionName, validTestCases, questionData) => {
     // Extract imports from user code and place them at top level
     const importLines = [];
     const codeLines = [];
@@ -643,6 +663,13 @@ export default function TestInterface() {
     });
     
     const userCodeWithoutImports = codeLines.join('\n');
+    
+    // Check if this is a tree or linked list problem
+    const isTreeOrLinkedListProblem = /tree|node|root|left|right|head|next|listnode|treenode/i.test(questionData?.problem || '') ||
+                                      /TreeNode|ListNode|tree|node|root|left|right|head|next/i.test(normalizedCode || '');
+    
+    // Get Java helpers if needed
+    const javaHelpers = isTreeOrLinkedListProblem ? getJavaHelpers() : '';
     
     const testCode = validTestCases.map((tc, idx) => {
       const inputStr = typeof tc.input === 'string' ? tc.input : '';
@@ -767,6 +794,7 @@ export default function TestInterface() {
     return `${importLines.length > 0 ? importLines.join('\n') + '\n\n' : ''}import java.util.*;
 
 public class Main {
+${javaHelpers}
     ${userCodeWithoutImports.replace(/^/gm, '    ').replace(/class\s+\w+/g, 'static class Solution')}
 
     public static void main(String[] args) {
